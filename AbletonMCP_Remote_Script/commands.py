@@ -210,18 +210,33 @@ def handle_delete_clip(surface, params):
     return {"deleted": True}
 
 
+def _parse_notes(notes):
+    """Parse notes from either dict or abbreviated [pitch, time, dur, vel] format."""
+    live_notes = []
+    for n in notes:
+        if isinstance(n, (list, tuple)):
+            live_notes.append((
+                n[0],                                   # pitch
+                n[1],                                   # start_time
+                n[2] if len(n) > 2 else 0.25,           # duration
+                n[3] if len(n) > 3 else 100,            # velocity
+                False                                    # mute
+            ))
+        else:
+            live_notes.append((
+                n.get("pitch", 60),
+                n.get("start_time", 0.0),
+                n.get("duration", 0.25),
+                n.get("velocity", 100),
+                n.get("mute", False)
+            ))
+    return live_notes
+
+
 def handle_add_notes_to_clip(surface, params):
     slot, clip = _get_clip(surface, params)
     notes = params.get("notes", [])
-    live_notes = []
-    for n in notes:
-        live_notes.append((
-            n.get("pitch", 60),
-            n.get("start_time", 0.0),
-            n.get("duration", 0.25),
-            n.get("velocity", 100),
-            n.get("mute", False)
-        ))
+    live_notes = _parse_notes(notes)
     clip.set_notes(tuple(live_notes))
     return {"note_count": len(notes)}
 
@@ -667,3 +682,187 @@ def handle_setup_sidechain(surface, params):
         "source_track": source_track.name,
         "note": "Sidechain routing may need manual verification in Ableton"
     }
+
+
+# ── Composite handlers ────────────────────────────────────────
+
+def handle_create_track(surface, params):
+    """Create a track with name, instrument, and volume in one call."""
+    song = _get_song(surface)
+    track_type = params.get("type", "midi")
+    name = params.get("name")
+    instrument_uri = params.get("instrument_uri")
+    volume = params.get("volume")
+    index = params.get("index", -1)
+
+    if track_type == "audio":
+        song.create_audio_track(index)
+    else:
+        song.create_midi_track(index)
+    new_index = len(song.tracks) - 1 if index == -1 else index
+    track = song.tracks[new_index]
+
+    if name:
+        track.name = name
+
+    if instrument_uri:
+        app = surface.application()
+        item = _find_browser_item_by_uri(app.browser, instrument_uri)
+        if item:
+            song.view.selected_track = track
+            app.browser.load_item(item)
+
+    if volume is not None:
+        track.mixer_device.volume.value = max(0.0, min(1.0, volume))
+
+    return {
+        "track_index": new_index,
+        "name": track.name,
+        "type": track_type
+    }
+
+
+def handle_write_clip(surface, params):
+    """Create a clip, add notes, and set name in one call."""
+    track = _get_track(surface, params)
+    clip_index = params.get("clip_index", 0)
+    length = params.get("length", 4.0)
+    notes = params.get("notes", [])
+    name = params.get("name")
+    overwrite = params.get("overwrite", False)
+
+    if clip_index < 0 or clip_index >= len(track.clip_slots):
+        raise IndexError("Clip index out of range")
+    slot = track.clip_slots[clip_index]
+
+    if slot.has_clip:
+        if overwrite:
+            slot.delete_clip()
+        else:
+            raise Exception("Clip slot already has a clip (use overwrite=true)")
+
+    slot.create_clip(length)
+    clip = slot.clip
+
+    if notes:
+        live_notes = _parse_notes(notes)
+        clip.set_notes(tuple(live_notes))
+
+    if name:
+        clip.name = name
+
+    return {
+        "track_index": params.get("track_index", 0),
+        "clip_index": clip_index,
+        "name": clip.name,
+        "length": clip.length,
+        "note_count": len(notes)
+    }
+
+
+def handle_set_mix(surface, params):
+    """Set volume and pan for multiple tracks in one call."""
+    song = _get_song(surface)
+    tracks = params.get("tracks", [])
+    results = []
+    for t in tracks:
+        idx = t.get("track_index", t.get("index", 0))
+        if idx < 0 or idx >= len(song.tracks):
+            results.append({"track_index": idx, "error": "Track index out of range"})
+            continue
+        track = song.tracks[idx]
+        if "volume" in t:
+            track.mixer_device.volume.value = max(0.0, min(1.0, t["volume"]))
+        if "pan" in t:
+            track.mixer_device.panning.value = max(-1.0, min(1.0, t["pan"]))
+        results.append({
+            "track_index": idx,
+            "name": track.name,
+            "volume": track.mixer_device.volume.value,
+            "panning": track.mixer_device.panning.value
+        })
+    return {"tracks": results}
+
+
+# ── Batch & Compose ────────────────────────────────────────────
+
+def handle_batch(surface, params):
+    """Execute a list of commands in a single main-thread callback."""
+    commands = params.get("commands", [])
+    results = []
+    for cmd in commands:
+        cmd_type = cmd.get("type", "")
+        cmd_params = cmd.get("params", {})
+        handler = globals().get("handle_" + cmd_type)
+        if handler is None:
+            results.append({"status": "error", "error": "Unknown command: " + cmd_type})
+        else:
+            try:
+                result = handler(surface, cmd_params)
+                results.append({"status": "success", "result": result})
+            except Exception as e:
+                results.append({"status": "error", "error": str(e)})
+    return {"results": results, "count": len(results)}
+
+
+def handle_compose(surface, params):
+    """Execute a sequence of composition operations in a single call."""
+    operations = params.get("operations", [])
+    results = []
+    created_tracks = {}  # sequential ref -> actual Ableton track index
+
+    for op in operations:
+        op_type = op.get("op")
+        try:
+            if op_type == "tempo":
+                handle_set_tempo(surface, {"tempo": op.get("bpm", 120)})
+                results.append({"op": "tempo", "bpm": op.get("bpm")})
+
+            elif op_type == "track":
+                result = handle_create_track(surface, {
+                    "name": op.get("name"),
+                    "instrument_uri": op.get("instrument_uri"),
+                    "type": op.get("type", "midi"),
+                    "volume": op.get("volume"),
+                    "index": op.get("index", -1),
+                })
+                ref = len(created_tracks)
+                created_tracks[ref] = result["track_index"]
+                results.append({"op": "track", "ref": ref, "track_index": result["track_index"]})
+
+            elif op_type == "clip":
+                track_idx = op.get("track")
+                # Support "ref:N" to reference Nth track created in this compose call
+                if isinstance(track_idx, str) and track_idx.startswith("ref:"):
+                    ref = int(track_idx.split(":")[1])
+                    track_idx = created_tracks.get(ref, 0)
+                handle_write_clip(surface, {
+                    "track_index": track_idx,
+                    "clip_index": op.get("slot", 0),
+                    "notes": op.get("notes", []),
+                    "name": op.get("name"),
+                    "length": op.get("length", 4),
+                    "overwrite": op.get("overwrite", False),
+                })
+                results.append({"op": "clip", "track_index": track_idx, "slot": op.get("slot", 0)})
+
+            elif op_type == "mix":
+                handle_set_mix(surface, {"tracks": op.get("tracks", [])})
+                results.append({"op": "mix"})
+
+            elif op_type == "play":
+                scene = op.get("scene")
+                if scene is not None:
+                    handle_fire_scene(surface, {"scene_index": scene})
+                    results.append({"op": "play", "scene": scene})
+                else:
+                    handle_start_playback(surface, {})
+                    results.append({"op": "play"})
+
+            else:
+                results.append({"op": op_type, "error": "Unknown operation"})
+
+        except Exception as e:
+            results.append({"op": op_type, "error": str(e)})
+
+    return {"operations_completed": len(results), "results": results}

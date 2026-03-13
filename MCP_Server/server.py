@@ -90,7 +90,7 @@ class AbletonConnection:
             self.sock.sendall(json.dumps(command).encode('utf-8'))
             if is_modifying:
                 import time
-                time.sleep(0.1)
+                time.sleep(0.025)
             self.sock.settimeout(15.0 if is_modifying else 10.0)
             response_data = self.receive_full_response(self.sock)
             response = json.loads(response_data.decode('utf-8'))
@@ -98,7 +98,7 @@ class AbletonConnection:
                 raise Exception(response.get("message", "Unknown error"))
             if is_modifying:
                 import time
-                time.sleep(0.1)
+                time.sleep(0.025)
             return response.get("result", {})
         except socket.timeout:
             self.sock = None
@@ -194,7 +194,101 @@ def get_track_info(ctx: Context, track_index: int) -> str:
     return json.dumps(_cmd("get_track_info", {"track_index": track_index}), indent=2)
 
 
-# ── Track creation & config ─────────────────────────────────────
+# ── Composite tools (Tier 1) ──────────────────────────────────
+
+@mcp.tool()
+def create_track(ctx: Context, name: str, instrument_uri: str = "",
+                 type: str = "midi", volume: float = None, index: int = -1) -> str:
+    """
+    Create a new track with name, instrument, and volume in one call.
+    Replaces the 3-call sequence: create_midi_track + set_track_name + load_instrument.
+
+    Parameters:
+    - name: Track name
+    - instrument_uri: URI of instrument to load (optional, from search_browser)
+    - type: "midi" or "audio" (default: "midi")
+    - volume: Volume level 0.0-1.0 (optional, default ~0.85)
+    - index: Position to insert at (-1 = end)
+    """
+    params = {"name": name, "type": type, "index": index}
+    if instrument_uri:
+        params["instrument_uri"] = instrument_uri
+    if volume is not None:
+        params["volume"] = volume
+    return json.dumps(_cmd("create_track", params), indent=2)
+
+
+@mcp.tool()
+def write_clip(ctx: Context, track_index: int, clip_index: int,
+               notes: List[Union[Dict[str, Union[int, float, bool]], List[Union[int, float]]]],
+               name: str = "", length: float = 4.0, overwrite: bool = False) -> str:
+    """
+    Create a clip, add notes, and set name in one call.
+    Replaces the 3-call sequence: create_clip + add_notes_to_clip + set_clip_name.
+
+    Parameters:
+    - track_index: Track index
+    - clip_index: Clip slot index
+    - notes: MIDI notes as dicts {pitch, start_time, duration, velocity}
+             OR abbreviated [pitch, time, duration, velocity] tuples
+    - name: Clip name (optional)
+    - length: Clip length in beats (default: 4.0)
+    - overwrite: If true, delete existing clip first (default: false)
+    """
+    params = {
+        "track_index": track_index, "clip_index": clip_index,
+        "notes": notes, "length": length, "overwrite": overwrite
+    }
+    if name:
+        params["name"] = name
+    return json.dumps(_cmd("write_clip", params), indent=2)
+
+
+@mcp.tool()
+def set_mix(ctx: Context, tracks: List[Dict[str, Union[int, float]]]) -> str:
+    """
+    Set volume and pan for multiple tracks in one call.
+
+    Parameters:
+    - tracks: List of dicts, each with:
+        - track_index (or index): Track number
+        - volume: 0.0-1.0 (optional)
+        - pan: -1.0 to 1.0 (optional)
+    """
+    return json.dumps(_cmd("set_mix", {"tracks": tracks}), indent=2)
+
+
+# ── Compose DSL (Tier 2) ──────────────────────────────────────
+
+@mcp.tool()
+def compose(ctx: Context, operations: List[Dict[str, Any]]) -> str:
+    """
+    Execute a sequence of composition operations in a single call.
+    Can build an entire song in one tool call.
+
+    Parameters:
+    - operations: List of operation dicts. Each has an "op" key:
+
+      {"op": "tempo", "bpm": 128}
+
+      {"op": "track", "name": "Drums", "instrument_uri": "...", "volume": 0.7}
+      Returns ref index for use in clip ops.
+
+      {"op": "clip", "track": 0, "slot": 0, "name": "Beat", "length": 8,
+       "notes": [[36,0,0.5,100], [38,1,0.5,80]]}
+      track is absolute Ableton index. Use "ref:N" to reference Nth track
+      created in this compose call.
+
+      {"op": "mix", "tracks": [{"index": 0, "volume": 0.7}]}
+
+      {"op": "play", "scene": 0}
+
+    Notes support abbreviated [pitch, time, duration, velocity] tuples.
+    """
+    return json.dumps(_cmd("compose", {"operations": operations}), indent=2)
+
+
+# ── Individual tools ────────────────────────────────────────────
 
 @mcp.tool()
 def create_midi_track(ctx: Context, index: int = -1) -> str:
@@ -221,6 +315,21 @@ def create_audio_track(ctx: Context, index: int = -1) -> str:
 
 
 @mcp.tool()
+def set_track_send(ctx: Context, track_index: int, send_index: int, value: float) -> str:
+    """
+    Set the send level of a track to a return track.
+
+    Parameters:
+    - track_index: The index of the track
+    - send_index: The index of the send (0 = Send A, 1 = Send B, etc.)
+    - value: The send level (0.0 to 1.0)
+    """
+    return json.dumps(_cmd("set_track_send", {
+        "track_index": track_index, "send_index": send_index, "value": value
+    }))
+
+
+@mcp.tool()
 def set_track_name(ctx: Context, track_index: int, name: str) -> str:
     """
     Set the name of a track.
@@ -244,23 +353,6 @@ def set_track_volume(ctx: Context, track_index: int, volume: float) -> str:
     """
     return json.dumps(_cmd("set_track_volume", {"track_index": track_index, "volume": volume}))
 
-
-@mcp.tool()
-def set_track_send(ctx: Context, track_index: int, send_index: int, value: float) -> str:
-    """
-    Set the send level of a track to a return track.
-
-    Parameters:
-    - track_index: The index of the track
-    - send_index: The index of the send (0 = Send A, 1 = Send B, etc.)
-    - value: The send level (0.0 to 1.0)
-    """
-    return json.dumps(_cmd("set_track_send", {
-        "track_index": track_index, "send_index": send_index, "value": value
-    }))
-
-
-# ── Clips ───────────────────────────────────────────────────────
 
 @mcp.tool()
 def create_clip(ctx: Context, track_index: int, clip_index: int, length: float = 4.0) -> str:
@@ -290,25 +382,6 @@ def delete_clip(ctx: Context, track_index: int, clip_index: int) -> str:
 
 
 @mcp.tool()
-def add_notes_to_clip(
-    ctx: Context,
-    track_index: int,
-    clip_index: int,
-    notes: List[Dict[str, Union[int, float, bool]]]
-) -> str:
-    """
-    Add MIDI notes to a clip.
-
-    Parameters:
-    - track_index: The index of the track containing the clip
-    - clip_index: The index of the clip slot containing the clip
-    - notes: List of note dictionaries, each with pitch, start_time, duration, velocity, and mute
-    """
-    _cmd("add_notes_to_clip", {"track_index": track_index, "clip_index": clip_index, "notes": notes})
-    return f"Added {len(notes)} notes to clip at track {track_index}, slot {clip_index}"
-
-
-@mcp.tool()
 def get_clip_notes(ctx: Context, track_index: int, clip_index: int) -> str:
     """
     Get all MIDI notes from a clip.
@@ -331,6 +404,25 @@ def clear_notes(ctx: Context, track_index: int, clip_index: int) -> str:
     """
     _cmd("clear_notes", {"track_index": track_index, "clip_index": clip_index})
     return f"Cleared all notes from clip at track {track_index}, slot {clip_index}"
+
+
+@mcp.tool()
+def add_notes_to_clip(
+    ctx: Context,
+    track_index: int,
+    clip_index: int,
+    notes: List[Dict[str, Union[int, float, bool]]]
+) -> str:
+    """
+    Add MIDI notes to a clip.
+
+    Parameters:
+    - track_index: The index of the track containing the clip
+    - clip_index: The index of the clip slot containing the clip
+    - notes: List of note dictionaries, each with pitch, start_time, duration, velocity, and mute
+    """
+    _cmd("add_notes_to_clip", {"track_index": track_index, "clip_index": clip_index, "notes": notes})
+    return f"Added {len(notes)} notes to clip at track {track_index}, slot {clip_index}"
 
 
 @mcp.tool()
@@ -483,6 +575,18 @@ def set_device_parameter(ctx: Context, track_index: int, device_index: int,
 # ── Browser ─────────────────────────────────────────────────────
 
 @mcp.tool()
+def search_browser(ctx: Context, query: str, max_results: int = 20) -> str:
+    """
+    Search Ableton's browser for instruments, effects, or sounds by name.
+
+    Parameters:
+    - query: Search term (case-insensitive, matches partial names)
+    - max_results: Maximum number of results to return (default: 20)
+    """
+    return json.dumps(_cmd("search_browser", {"query": query, "max_results": max_results}), indent=2)
+
+
+@mcp.tool()
 def get_browser_tree(ctx: Context, category_type: str = "all") -> str:
     """
     Get a hierarchical tree of browser categories from Ableton.
@@ -515,18 +619,6 @@ def get_browser_items_at_path(ctx: Context, path: str) -> str:
 
 
 @mcp.tool()
-def search_browser(ctx: Context, query: str, max_results: int = 20) -> str:
-    """
-    Search Ableton's browser for instruments, effects, or sounds by name.
-
-    Parameters:
-    - query: Search term (case-insensitive, matches partial names)
-    - max_results: Maximum number of results to return (default: 20)
-    """
-    return json.dumps(_cmd("search_browser", {"query": query, "max_results": max_results}), indent=2)
-
-
-@mcp.tool()
 def load_instrument_or_effect(ctx: Context, track_index: int, uri: str) -> str:
     """
     Load an instrument or effect onto a track using its URI.
@@ -551,11 +643,9 @@ def load_drum_kit(ctx: Context, track_index: int, rack_uri: str, kit_path: str) 
     - rack_uri: The URI of the drum rack to load (e.g., 'Drums/Drum Rack')
     - kit_path: Path to the drum kit inside the browser (e.g., 'drums/acoustic/kit1')
     """
-    # Load rack
     result = _cmd("load_browser_item", {"track_index": track_index, "item_uri": rack_uri})
     if not result.get("loaded", False):
         return f"Failed to load drum rack with URI '{rack_uri}'"
-    # Browse for kit
     kit_result = _cmd("get_browser_items_at_path", {"path": kit_path})
     if "error" in kit_result:
         return f"Loaded drum rack but failed to find kit: {kit_result.get('error')}"
