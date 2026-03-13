@@ -3,9 +3,11 @@
 
 AbletonMCP connects Ableton Live to Claude AI through the Model Context Protocol (MCP), allowing Claude to directly interact with and control Ableton Live. This integration enables prompt-assisted music production, track creation, and Live session manipulation.
 
+This is a fork of [closestfriend/ableton-mcp](https://github.com/closestfriend/ableton-mcp) with additional features listed below.
+
 ### Join the Community
 
-Give feedback, get inspired, and build on top of the MCP: [Discord](https://discord.gg/3ZrMyGKnaU). Made by [Siddharth](https://x.com/sidahuj)
+Give feedback, get inspired, and build on top of the MCP: [Discord](https://discord.gg/3ZrMyGKnaU). Originally made by [Siddharth](https://x.com/sidahuj)
 
 ## Features
 
@@ -15,12 +17,23 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 - **Clip creation**: Create and edit MIDI clips with notes
 - **Session control**: Start and stop playback, fire clips, and control transport
 
+### Additional Features (this fork)
+
+- **Composition flow tools**: `create_track`, `write_clip`, `set_mix`, and `compose` — batch operations that replace multi-call sequences, allowing Claude to build an entire song in a single tool call
+- **Scene control**: `fire_scene` to trigger all clips in a row, and `fire_scene_sequence` for beat-timed scene arrangements with zero network latency between transitions
+- **Session recording**: `start_recording` / `stop_recording` for recording MIDI input into Session View clip slots
+- **Arrangement recording**: `start_arrangement_recording` with optional `stop_after_beats` parameter — records scene performances into the Arrangement timeline for export, with automatic timed stop
+- **Sidechain routing**: `setup_sidechain` to configure a compressor's sidechain input from another track
+- **Save**: `save_set` and `save_set_as` for saving the Live set
+- **Hot-reload architecture**: The Remote Script is split into a thin bootstrap (`__init__.py`) and a `commands.py` module that can be reloaded without restarting Ableton via the `reload_commands` tool
+- **Ableton 12 compatibility**: Adds `get_capabilities()` required by Ableton 12's control surface loader
+
 ## Components
 
 The system consists of two main components:
 
-1. **Ableton Remote Script** (`Ableton_Remote_Script/__init__.py`): A MIDI Remote Script for Ableton Live that creates a socket server to receive and execute commands
-2. **MCP Server** (`server.py`): A Python server that implements the Model Context Protocol and connects to the Ableton Remote Script
+1. **Ableton Remote Script** (`AbletonMCP_Remote_Script/`): A MIDI Remote Script for Ableton Live that creates a socket server to receive and execute commands. Uses a hot-reload architecture with `__init__.py` (bootstrap) and `commands.py` (handlers).
+2. **MCP Server** (`MCP_Server/server.py`): A Python server that implements the Model Context Protocol and connects to the Ableton Remote Script
 
 ## Installation
 
@@ -99,7 +112,7 @@ uvx ableton-mcp
      `C:\Program Files\Ableton\Live XX\Resources\MIDI Remote Scripts\`
    *Note: Replace XX with your Ableton version number (e.g., 10, 11, 12)*
 
-4. Create a folder called 'AbletonMCP' in the Remote Scripts directory and paste the downloaded '\_\_init\_\_.py' file
+4. Create a folder called 'AbletonMCP' in the Remote Scripts directory and copy both `__init__.py` and `commands.py` from `AbletonMCP_Remote_Script/` into it
 
 3. Launch Ableton Live
 
@@ -126,10 +139,16 @@ Once the config file has been set on Claude, and the remote script is running in
 - Get session and track information
 - Create and modify MIDI and audio tracks
 - Create, edit, and trigger clips
-- Control playback
+- Control playback (start, stop, fire clips and scenes)
 - Load instruments and effects from Ableton's browser
 - Add notes to MIDI clips
 - Change tempo and other session parameters
+- Record session or arrangement performances
+- Batch composition with single-call track/clip/mix creation
+- Beat-timed scene sequencing for full song arrangements
+- Sidechain routing configuration
+- Save and export Live sets
+- Hot-reload command handlers without restarting Ableton
 
 ## Example Commands
 
