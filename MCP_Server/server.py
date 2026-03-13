@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, List, Union
 
+from . import style_index
+
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("AbletonMCPServer")
@@ -40,9 +42,9 @@ class AbletonConnection:
             finally:
                 self.sock = None
 
-    def receive_full_response(self, sock, buffer_size=8192):
+    def receive_full_response(self, sock, buffer_size=8192, timeout=15.0):
         chunks = []
-        sock.settimeout(15.0)
+        sock.settimeout(timeout)
         try:
             while True:
                 try:
@@ -73,7 +75,8 @@ class AbletonConnection:
                 raise Exception("Incomplete JSON response")
         raise Exception("No data received")
 
-    def send_command(self, command_type: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+    def send_command(self, command_type: str, params: Dict[str, Any] = None,
+                     timeout: float = None) -> Dict[str, Any]:
         if not self.sock and not self.connect():
             raise ConnectionError("Not connected to Ableton")
 
@@ -84,15 +87,19 @@ class AbletonConnection:
             "get_browser_item", "get_browser_categories", "get_browser_items",
             "get_browser_tree", "get_browser_items_at_path",
             "get_clip_notes", "get_device_parameters", "search_browser",
+            "crawl_browser",
         }
+
+        if timeout is None:
+            timeout = 15.0 if is_modifying else 10.0
 
         try:
             self.sock.sendall(json.dumps(command).encode('utf-8'))
             if is_modifying:
                 import time
                 time.sleep(0.025)
-            self.sock.settimeout(15.0 if is_modifying else 10.0)
-            response_data = self.receive_full_response(self.sock)
+            self.sock.settimeout(timeout)
+            response_data = self.receive_full_response(self.sock, timeout=timeout)
             response = json.loads(response_data.decode('utf-8'))
             if response.get("status") == "error":
                 raise Exception(response.get("message", "Unknown error"))
@@ -171,8 +178,9 @@ def get_ableton_connection():
 
 # ── Helper to reduce boilerplate ────────────────────────────────
 
-def _cmd(command_type: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
-    return get_ableton_connection().send_command(command_type, params)
+def _cmd(command_type: str, params: Dict[str, Any] = None,
+         timeout: float = None) -> Dict[str, Any]:
+    return get_ableton_connection().send_command(command_type, params, timeout=timeout)
 
 
 # ── Session ─────────────────────────────────────────────────────
@@ -506,6 +514,22 @@ def stop_recording(ctx: Context) -> str:
 
 
 @mcp.tool()
+def start_arrangement_recording(ctx: Context, stop_after_beats: int = None) -> str:
+    """
+    Start arrangement recording in Ableton. Records the session performance
+    (scene launches, clip playback) into the Arrangement timeline.
+
+    Parameters:
+    - stop_after_beats: Optional number of beats after which to automatically
+      stop recording and playback. Useful for capturing a fixed-length arrangement.
+    """
+    params = {}
+    if stop_after_beats is not None:
+        params["stop_after_beats"] = stop_after_beats
+    return json.dumps(_cmd("start_arrangement_recording", params))
+
+
+@mcp.tool()
 def fire_scene(ctx: Context, scene_index: int) -> str:
     """
     Fire all clips in a scene (row) simultaneously.
@@ -695,6 +719,128 @@ def setup_sidechain(ctx: Context, track_index: int, device_index: int,
         "device_index": device_index,
         "sidechain_source_track": sidechain_source_track
     }), indent=2)
+
+
+# ── Style Index ──────────────────────────────────────────────────
+
+@mcp.tool()
+def build_index(ctx: Context, force: bool = False) -> str:
+    """
+    Crawl Ableton's browser and cache all instruments, effects, and sounds to disk.
+    Skips if the index is less than 24 hours old, unless force=True.
+
+    Parameters:
+    - force: Rebuild even if the index is fresh (default: False)
+    """
+    age = style_index.index_age_hours()
+    if not force and age is not None and age < 24:
+        idx = style_index.load_index()
+        return json.dumps({
+            "skipped": True,
+            "reason": f"Index is {age:.1f}h old (< 24h). Use force=True to rebuild.",
+            "stats": idx.get("stats", {}),
+        }, indent=2)
+
+    crawl_result = _cmd("crawl_browser", {"category": "all", "max_depth": 10}, timeout=120.0)
+    save_result = style_index.save_index(crawl_result)
+    return json.dumps(save_result, indent=2)
+
+
+@mcp.tool()
+def search_index(ctx: Context, query: str, category: str = "all", limit: int = 50) -> str:
+    """
+    Search the cached browser index — instant, no Ableton round-trip.
+    Run build_index() first if the index doesn't exist.
+
+    Parameters:
+    - query: Search term (case-insensitive, matches name and path)
+    - category: Filter by category ('all', 'instruments', 'sounds', 'drums', 'audio_effects', 'midi_effects')
+    - limit: Maximum results (default: 50)
+    """
+    result = style_index.search_index(query, category, limit)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def get_palette(ctx: Context, style: str) -> str:
+    """
+    Return the instrument/effect palette for a music style.
+    Resolves URIs against the cached browser index. Run build_index() first.
+
+    Parameters:
+    - style: Style name (e.g., 'lofi', 'disco_house')
+    """
+    result = style_index.get_palette(style)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def analyze_session(ctx: Context) -> str:
+    """
+    Read all tracks' devices and score against each palette.
+    Returns the best matching style and per-palette scores.
+    """
+    session = _cmd("get_session_info")
+    track_count = session.get("track_count", 0)
+
+    tracks = []
+    for i in range(track_count):
+        track_info = _cmd("get_track_info", {"track_index": i})
+        tracks.append(track_info)
+
+    result = style_index.analyze_session_against_palettes(tracks)
+    result["track_count"] = track_count
+    return json.dumps(result, indent=2)
+
+
+# ── Duplicate / Copy ────────────────────────────────────────────
+
+@mcp.tool()
+def duplicate_clip(ctx: Context, src_track_index: int, src_clip_index: int,
+                   dst_track_index: int, dst_clip_index: int,
+                   name: str = "", overwrite: bool = False) -> str:
+    """
+    Copy a clip from one slot to another (same or different track).
+    All note data is copied inside Ableton — no network transfer.
+
+    Parameters:
+    - src_track_index: Source track index
+    - src_clip_index: Source clip slot index
+    - dst_track_index: Destination track index
+    - dst_clip_index: Destination clip slot index
+    - name: Name for the new clip (default: same as source)
+    - overwrite: If true, overwrite existing clip at destination
+    """
+    params = {
+        "src_track_index": src_track_index, "src_clip_index": src_clip_index,
+        "dst_track_index": dst_track_index, "dst_clip_index": dst_clip_index,
+        "overwrite": overwrite
+    }
+    if name:
+        params["name"] = name
+    return json.dumps(_cmd("duplicate_clip", params), indent=2)
+
+
+@mcp.tool()
+def duplicate_scene(ctx: Context, src_scene_index: int, dst_scene_index: int,
+                    name: str = "", overwrite: bool = False) -> str:
+    """
+    Copy all clips from one scene (row) to another.
+    Copies every clip across all tracks in a single call.
+
+    Parameters:
+    - src_scene_index: Source scene (row) index
+    - dst_scene_index: Destination scene (row) index
+    - name: Name for all copied clips (default: keep original names)
+    - overwrite: If true, overwrite existing clips at destination
+    """
+    params = {
+        "src_scene_index": src_scene_index, "dst_scene_index": dst_scene_index,
+        "overwrite": overwrite
+    }
+    if name:
+        params["name"] = name
+    return json.dumps(_cmd("duplicate_scene", params), indent=2)
 
 
 # ── Hot-reload ──────────────────────────────────────────────────

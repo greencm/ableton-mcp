@@ -321,6 +321,34 @@ def handle_stop_recording(surface, params):
     return {"recording": False, "playing": song.is_playing}
 
 
+def handle_start_arrangement_recording(surface, params):
+    song = _get_song(surface)
+    stop_after_beats = params.get("stop_after_beats")
+
+    song.record_mode = True
+    if not song.is_playing:
+        song.start_playing()
+
+    result = {"recording": True, "playing": True, "tempo": song.tempo}
+
+    if stop_after_beats is not None:
+        ticks_per_beat = 600.0 / song.tempo
+        delay_ticks = int(stop_after_beats * ticks_per_beat)
+
+        def stop_recording():
+            try:
+                song.record_mode = False
+                song.stop_playing()
+                surface.log_message("Arrangement recording stopped after " + str(stop_after_beats) + " beats")
+            except Exception as ex:
+                surface.log_message("Stop recording error: " + str(ex))
+
+        surface.schedule_message(delay_ticks, stop_recording)
+        result["stop_after_beats"] = stop_after_beats
+
+    return result
+
+
 def handle_fire_scene(surface, params):
     song = _get_song(surface)
     scene_index = params.get("scene_index", 0)
@@ -584,6 +612,57 @@ def handle_search_browser(surface, params):
                 pass
 
     return {"query": query, "results": results, "count": len(results)}
+
+
+def handle_crawl_browser(surface, params):
+    """Walk the full browser tree and return every loadable item."""
+    app = surface.application()
+    if not app or not hasattr(app, 'browser') or app.browser is None:
+        raise RuntimeError("Browser not available")
+    browser = app.browser
+    category = params.get("category", "all")
+    max_depth = params.get("max_depth", 10)
+
+    cat_map = {
+        "instruments": "instruments", "sounds": "sounds",
+        "drums": "drums", "audio_effects": "audio_effects",
+        "midi_effects": "midi_effects",
+    }
+    cats = cat_map if category == "all" else {category: cat_map[category]}
+    result = {}
+
+    for key, attr in cats.items():
+        items = []
+        if not hasattr(browser, attr):
+            continue
+
+        def crawl(item, path, depth):
+            if depth > max_depth:
+                return
+            if not hasattr(item, 'children'):
+                return
+            try:
+                for child in item.children:
+                    name = child.name if hasattr(child, 'name') else ""
+                    child_path = path + "/" + name if path else name
+                    is_loadable = hasattr(child, 'is_loadable') and child.is_loadable
+                    uri = child.uri if hasattr(child, 'uri') else None
+                    if is_loadable and uri:
+                        items.append({
+                            "name": name, "path": child_path,
+                            "uri": uri,
+                            "is_device": hasattr(child, 'is_device') and child.is_device,
+                        })
+                    if hasattr(child, 'children') and child.children:
+                        crawl(child, child_path, depth + 1)
+            except Exception:
+                pass
+
+        crawl(getattr(browser, attr), key, 0)
+        result[key] = items
+
+    total = sum(len(v) for v in result.values())
+    return {"categories": result, "total_items": total}
 
 
 # ── Instrument/effect loading ───────────────────────────────────
@@ -866,3 +945,75 @@ def handle_compose(surface, params):
             results.append({"op": op_type, "error": str(e)})
 
     return {"operations_completed": len(results), "results": results}
+
+
+# ── Duplicate / Copy ────────────────────────────────────────────
+
+def handle_duplicate_clip(surface, params):
+    """Copy a clip from one slot to another (same or different track)."""
+    src_track = _get_track(surface, {"track_index": params["src_track_index"]})
+    dst_track = _get_track(surface, {"track_index": params.get("dst_track_index", params["src_track_index"])})
+    src_idx = params["src_clip_index"]
+    dst_idx = params["dst_clip_index"]
+
+    if src_idx < 0 or src_idx >= len(src_track.clip_slots):
+        raise IndexError("Source clip index out of range")
+    if dst_idx < 0 or dst_idx >= len(dst_track.clip_slots):
+        raise IndexError("Destination clip index out of range")
+
+    src_slot = src_track.clip_slots[src_idx]
+    dst_slot = dst_track.clip_slots[dst_idx]
+
+    if not src_slot.has_clip:
+        raise Exception("Source slot has no clip")
+    if dst_slot.has_clip:
+        if params.get("overwrite", False):
+            dst_slot.delete_clip()
+        else:
+            raise Exception("Destination has clip (use overwrite=true)")
+
+    src_clip = src_slot.clip
+    dst_slot.create_clip(src_clip.length)
+    notes = src_clip.get_notes(0.0, 0, src_clip.length, 128)
+    dst_slot.clip.set_notes(notes)
+    dst_slot.clip.name = params.get("name", src_clip.name)
+
+    return {
+        "src_track": params["src_track_index"], "src_clip": src_idx,
+        "dst_track": params.get("dst_track_index", params["src_track_index"]),
+        "dst_clip": dst_idx,
+        "name": dst_slot.clip.name, "length": src_clip.length
+    }
+
+
+def handle_duplicate_scene(surface, params):
+    """Copy all clips from one scene row to another."""
+    song = _get_song(surface)
+    src = params["src_scene_index"]
+    dst = params["dst_scene_index"]
+    overwrite = params.get("overwrite", False)
+    name_prefix = params.get("name")
+    copied = []
+
+    for i, track in enumerate(song.tracks):
+        if src >= len(track.clip_slots) or dst >= len(track.clip_slots):
+            continue
+        src_slot = track.clip_slots[src]
+        dst_slot = track.clip_slots[dst]
+        if not src_slot.has_clip:
+            continue
+        if dst_slot.has_clip:
+            if overwrite:
+                dst_slot.delete_clip()
+            else:
+                continue
+        src_clip = src_slot.clip
+        dst_slot.create_clip(src_clip.length)
+        notes = src_clip.get_notes(0.0, 0, src_clip.length, 128)
+        dst_slot.clip.set_notes(notes)
+        dst_slot.clip.name = name_prefix if name_prefix else src_clip.name
+        copied.append({"track_index": i, "track_name": track.name,
+                        "clip_name": dst_slot.clip.name})
+
+    return {"src_scene": src, "dst_scene": dst,
+            "clips_copied": len(copied), "clips": copied}

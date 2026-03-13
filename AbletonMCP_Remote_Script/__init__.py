@@ -176,6 +176,7 @@ class AbletonMCP(ControlSurface):
         "get_session_info", "get_track_info",
         "get_browser_item", "get_browser_categories", "get_browser_items",
         "get_browser_tree", "get_browser_items_at_path",
+        "crawl_browser",
     }
 
     def _process_command(self, command):

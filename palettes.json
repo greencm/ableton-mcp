@@ -1,0 +1,131 @@
+{
+  "lofi": {
+    "description": "Lo-fi hip hop at 75-90 BPM, dusty keys, mellow bass, vinyl texture",
+    "tempo_range": [75, 90],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "DS Drum Rack", "notes": "Default drum sampler rack"},
+          {"name": "Boom Bap Kit", "notes": "Classic hip-hop drums"},
+          {"name": "LDre Cozy Kit", "notes": "Lo-fi oriented kit"}
+        ],
+        "effects": [
+          {"name": "Reverb", "role": "space"},
+          {"name": "Vinyl Distortion", "role": "texture"}
+        ]
+      },
+      "keys": {
+        "instruments": [
+          {"name": "E-Piano Dreamy", "notes": "Collision preset, warm Rhodes feel"},
+          {"name": "E-Piano Mellow", "notes": "Soft electric piano"}
+        ],
+        "effects": [
+          {"name": "Reverb", "role": "space"},
+          {"name": "Auto Filter", "role": "movement"}
+        ],
+        "effect_chains": [
+          {
+            "name": "Lo-Fi Keys",
+            "chain": ["Reverb", "Auto Filter"],
+            "notes": "Dark hall reverb into slow filter sweep"
+          }
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Basic Analog Bass", "notes": "Instrument Rack, warm sub"},
+          {"name": "Body Bass", "notes": "Deep mellow bass"}
+        ],
+        "effects": [
+          {"name": "Auto Filter", "role": "movement"}
+        ]
+      },
+      "atmosphere": {
+        "instruments": [
+          {"name": "Pad Lush", "notes": "Ambient pad texture"},
+          {"name": "Pad Warm", "notes": "Soft background pad"}
+        ],
+        "effects": [
+          {"name": "Reverb", "role": "space"},
+          {"name": "Delay", "role": "space"}
+        ]
+      }
+    },
+    "mix_template": {"drums": 0.7, "keys": 0.6, "bass": 0.75, "atmosphere": 0.45}
+  },
+  "disco_house": {
+    "description": "Disco house at 118-126 BPM, funky keys, brass stabs, driving 4-on-the-floor",
+    "tempo_range": [118, 126],
+    "tracks": {
+      "keys": {
+        "instruments": [
+          {"name": "E-Piano MKII Bright", "uri": "query:Synths#Electric:Piano%20&%20Keys:FileId_17302", "notes": "Bright electric piano for disco comps"},
+          {"name": "Clavinet Funky", "notes": "Wah clavinet for funky riffs"}
+        ],
+        "effects": [
+          {"name": "Chorus-Ensemble", "role": "width"},
+          {"name": "Phaser-Flanger", "role": "movement"}
+        ],
+        "effect_chains": [
+          {
+            "name": "Disco Keys",
+            "chain": ["Chorus-Ensemble", "Phaser-Flanger"],
+            "notes": "Classic chorus into subtle phaser sweep"
+          }
+        ]
+      },
+      "horns": {
+        "instruments": [
+          {"name": "Vanguard Brass", "uri": "query:Synths#Drift:Brass:FileId_17402", "notes": "Drift brass preset, disco stabs"},
+          {"name": "Brass Section", "notes": "Full brass section sound"}
+        ],
+        "effects": [
+          {"name": "Echo", "role": "space"},
+          {"name": "Reverb", "role": "space"}
+        ],
+        "effect_chains": [
+          {
+            "name": "Disco Brass",
+            "chain": ["Echo", "Reverb"],
+            "notes": "Tight echo into hall reverb for brass depth"
+          }
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Body Bass", "uri": "query:Synths#Instrument%20Rack:Bass:FileId_15437", "notes": "Warm disco bass with body"},
+          {"name": "Finger Bass", "notes": "Slapped/fingered bass sound"}
+        ],
+        "effects": [
+          {"name": "Auto Filter", "role": "movement"},
+          {"name": "Saturator", "role": "warmth"}
+        ],
+        "effect_chains": [
+          {
+            "name": "Disco Bass",
+            "chain": ["Auto Filter", "Saturator"],
+            "notes": "Filter envelope into gentle saturation"
+          }
+        ]
+      },
+      "drums": {
+        "instruments": [
+          {"name": "909 Core Kit", "uri": "query:Drums#FileId_15658", "notes": "Classic 909 for house drums"},
+          {"name": "707 Kit", "notes": "Vintage 707 disco drums"}
+        ],
+        "effects": [
+          {"name": "Drum Buss", "role": "glue"},
+          {"name": "Glue Compressor", "role": "punch"}
+        ],
+        "effect_chains": [
+          {
+            "name": "Disco Drums",
+            "chain": ["Drum Buss", "Glue Compressor"],
+            "notes": "Drum buss for pump into glue comp for punch"
+          }
+        ]
+      }
+    },
+    "mix_template": {"keys": 0.62, "horns": 0.58, "bass": 0.53, "drums": 0.62}
+  }
+}
