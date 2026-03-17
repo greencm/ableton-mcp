@@ -198,6 +198,8 @@ def get_track_info(ctx: Context, track_index: int) -> str:
 
     Parameters:
     - track_index: The index of the track to get information about
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0).
     """
     return json.dumps(_cmd("get_track_info", {"track_index": track_index}), indent=2)
 
@@ -217,6 +219,8 @@ def create_track(ctx: Context, name: str, instrument_uri: str = "",
     - type: "midi" or "audio" (default: "midi")
     - volume: Volume level 0.0-1.0 (optional, default ~0.85)
     - index: Position to insert at (-1 = end)
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0).
     """
     params = {"name": name, "type": type, "index": index}
     if instrument_uri:
@@ -242,6 +246,8 @@ def write_clip(ctx: Context, track_index: int, clip_index: int,
     - name: Clip name (optional)
     - length: Clip length in beats (default: 4.0)
     - overwrite: If true, delete existing clip first (default: false)
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = slot 0).
     """
     params = {
         "track_index": track_index, "clip_index": clip_index,
@@ -262,6 +268,8 @@ def set_mix(ctx: Context, tracks: List[Dict[str, Union[int, float]]]) -> str:
         - track_index (or index): Track number
         - volume: 0.0-1.0 (optional)
         - pan: -1.0 to 1.0 (optional)
+
+    NOTE: track_index is 0-based (Ableton UI Track 1 = index 0).
     """
     return json.dumps(_cmd("set_mix", {"tracks": tracks}), indent=2)
 
@@ -292,6 +300,8 @@ def compose(ctx: Context, operations: List[Dict[str, Any]]) -> str:
       {"op": "play", "scene": 0}
 
     Notes support abbreviated [pitch, time, duration, velocity] tuples.
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = slot 0).
     """
     return json.dumps(_cmd("compose", {"operations": operations}), indent=2)
 
@@ -305,6 +315,8 @@ def create_midi_track(ctx: Context, index: int = -1) -> str:
 
     Parameters:
     - index: The index to insert the track at (-1 = end of list)
+
+    NOTE: Index is 0-based (Ableton UI Track 1 = index 0).
     """
     result = _cmd("create_midi_track", {"index": index})
     return f"Created MIDI track: {result.get('name', 'unknown')} at index {result.get('index')}"
@@ -317,6 +329,8 @@ def create_audio_track(ctx: Context, index: int = -1) -> str:
 
     Parameters:
     - index: The index to insert the track at (-1 = end of list)
+
+    NOTE: Index is 0-based (Ableton UI Track 1 = index 0).
     """
     result = _cmd("create_audio_track", {"index": index})
     return f"Created audio track: {result.get('name', 'unknown')} at index {result.get('index')}"
@@ -331,6 +345,8 @@ def set_track_send(ctx: Context, track_index: int, send_index: int, value: float
     - track_index: The index of the track
     - send_index: The index of the send (0 = Send A, 1 = Send B, etc.)
     - value: The send level (0.0 to 1.0)
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Send A = send_index 0).
     """
     return json.dumps(_cmd("set_track_send", {
         "track_index": track_index, "send_index": send_index, "value": value
@@ -345,6 +361,8 @@ def set_track_name(ctx: Context, track_index: int, name: str) -> str:
     Parameters:
     - track_index: The index of the track to rename
     - name: The new name for the track
+
+    NOTE: track_index is 0-based (Ableton UI Track 1 = index 0).
     """
     result = _cmd("set_track_name", {"track_index": track_index, "name": name})
     return f"Renamed track to: {result.get('name', name)}"
@@ -358,6 +376,8 @@ def set_track_volume(ctx: Context, track_index: int, volume: float) -> str:
     Parameters:
     - track_index: The index of the track
     - volume: The volume level (0.0 to 1.0, where 0.85 is approximately 0dB)
+
+    NOTE: track_index is 0-based (Ableton UI Track 1 = index 0).
     """
     return json.dumps(_cmd("set_track_volume", {"track_index": track_index, "volume": volume}))
 
@@ -371,6 +391,8 @@ def create_clip(ctx: Context, track_index: int, clip_index: int, length: float =
     - track_index: The index of the track to create the clip in
     - clip_index: The index of the clip slot to create the clip in
     - length: The length of the clip in beats (default: 4.0)
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     _cmd("create_clip", {"track_index": track_index, "clip_index": clip_index, "length": length})
     return f"Created clip at track {track_index}, slot {clip_index} ({length} beats)"
@@ -384,6 +406,8 @@ def delete_clip(ctx: Context, track_index: int, clip_index: int) -> str:
     Parameters:
     - track_index: The index of the track containing the clip
     - clip_index: The index of the clip slot to delete from
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     _cmd("delete_clip", {"track_index": track_index, "clip_index": clip_index})
     return f"Deleted clip at track {track_index}, slot {clip_index}"
@@ -397,6 +421,8 @@ def get_clip_notes(ctx: Context, track_index: int, clip_index: int) -> str:
     Parameters:
     - track_index: The index of the track containing the clip
     - clip_index: The index of the clip slot containing the clip
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     return json.dumps(_cmd("get_clip_notes", {"track_index": track_index, "clip_index": clip_index}), indent=2)
 
@@ -409,6 +435,8 @@ def clear_notes(ctx: Context, track_index: int, clip_index: int) -> str:
     Parameters:
     - track_index: The index of the track containing the clip
     - clip_index: The index of the clip slot containing the clip
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     _cmd("clear_notes", {"track_index": track_index, "clip_index": clip_index})
     return f"Cleared all notes from clip at track {track_index}, slot {clip_index}"
@@ -428,6 +456,8 @@ def add_notes_to_clip(
     - track_index: The index of the track containing the clip
     - clip_index: The index of the clip slot containing the clip
     - notes: List of note dictionaries, each with pitch, start_time, duration, velocity, and mute
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     _cmd("add_notes_to_clip", {"track_index": track_index, "clip_index": clip_index, "notes": notes})
     return f"Added {len(notes)} notes to clip at track {track_index}, slot {clip_index}"
@@ -442,6 +472,8 @@ def set_clip_name(ctx: Context, track_index: int, clip_index: int, name: str) ->
     - track_index: The index of the track containing the clip
     - clip_index: The index of the clip slot containing the clip
     - name: The new name for the clip
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     _cmd("set_clip_name", {"track_index": track_index, "clip_index": clip_index, "name": name})
     return f"Renamed clip at track {track_index}, slot {clip_index} to '{name}'"
@@ -469,6 +501,8 @@ def fire_clip(ctx: Context, track_index: int, clip_index: int) -> str:
     Parameters:
     - track_index: The index of the track containing the clip
     - clip_index: The index of the clip slot containing the clip
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     _cmd("fire_clip", {"track_index": track_index, "clip_index": clip_index})
     return f"Started playing clip at track {track_index}, slot {clip_index}"
@@ -482,6 +516,8 @@ def stop_clip(ctx: Context, track_index: int, clip_index: int) -> str:
     Parameters:
     - track_index: The index of the track containing the clip
     - clip_index: The index of the clip slot containing the clip
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     _cmd("stop_clip", {"track_index": track_index, "clip_index": clip_index})
     return f"Stopped clip at track {track_index}, slot {clip_index}"
@@ -536,6 +572,8 @@ def fire_scene(ctx: Context, scene_index: int) -> str:
 
     Parameters:
     - scene_index: The index of the scene to fire
+
+    NOTE: scene_index is 0-based (Ableton UI Scene 1 = index 0).
     """
     return json.dumps(_cmd("fire_scene", {"scene_index": scene_index}))
 
@@ -558,6 +596,8 @@ def fire_scene_sequence(ctx: Context, scenes: List[Dict[str, Union[int, float]]]
         {"scene_index": 5, "delay_beats": 16},
         {"scene_index": 2, "delay_beats": 32}
     ]
+
+    NOTE: scene_index is 0-based (Ableton UI Scene 1 = index 0).
     """
     return json.dumps(_cmd("fire_scene_sequence", {"scenes": scenes}))
 
@@ -572,6 +612,8 @@ def get_device_parameters(ctx: Context, track_index: int, device_index: int) -> 
     Parameters:
     - track_index: The index of the track
     - device_index: The index of the device on the track
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0).
     """
     return json.dumps(_cmd("get_device_parameters", {
         "track_index": track_index, "device_index": device_index
@@ -589,6 +631,8 @@ def set_device_parameter(ctx: Context, track_index: int, device_index: int,
     - device_index: The index of the device on the track
     - parameter_index: The index of the parameter (use get_device_parameters to find indices)
     - value: The new value (will be clamped to parameter's min/max range)
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0).
     """
     return json.dumps(_cmd("set_device_parameter", {
         "track_index": track_index, "device_index": device_index,
@@ -650,6 +694,8 @@ def load_instrument_or_effect(ctx: Context, track_index: int, uri: str) -> str:
     Parameters:
     - track_index: The index of the track to load the instrument on
     - uri: The URI of the instrument or effect to load (e.g., 'query:Synths#Instrument%20Rack:Bass:FileId_5116')
+
+    NOTE: track_index is 0-based (Ableton UI Track 1 = index 0).
     """
     result = _cmd("load_browser_item", {"track_index": track_index, "item_uri": uri})
     if result.get("loaded", False):
@@ -666,6 +712,8 @@ def load_drum_kit(ctx: Context, track_index: int, rack_uri: str, kit_path: str) 
     - track_index: The index of the track to load on
     - rack_uri: The URI of the drum rack to load (e.g., 'Drums/Drum Rack')
     - kit_path: Path to the drum kit inside the browser (e.g., 'drums/acoustic/kit1')
+
+    NOTE: track_index is 0-based (Ableton UI Track 1 = index 0).
     """
     result = _cmd("load_browser_item", {"track_index": track_index, "item_uri": rack_uri})
     if not result.get("loaded", False):
@@ -713,6 +761,8 @@ def setup_sidechain(ctx: Context, track_index: int, device_index: int,
     - track_index: The track containing the compressor
     - device_index: The index of the Compressor device on that track
     - sidechain_source_track: The track index to use as sidechain input
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0).
     """
     return json.dumps(_cmd("setup_sidechain", {
         "track_index": track_index,
@@ -810,6 +860,8 @@ def duplicate_clip(ctx: Context, src_track_index: int, src_clip_index: int,
     - dst_clip_index: Destination clip slot index
     - name: Name for the new clip (default: same as source)
     - overwrite: If true, overwrite existing clip at destination
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
     """
     params = {
         "src_track_index": src_track_index, "src_clip_index": src_clip_index,
@@ -833,6 +885,8 @@ def duplicate_scene(ctx: Context, src_scene_index: int, dst_scene_index: int,
     - dst_scene_index: Destination scene (row) index
     - name: Name for all copied clips (default: keep original names)
     - overwrite: If true, overwrite existing clips at destination
+
+    NOTE: scene indices are 0-based (Ableton UI Scene 1 = index 0).
     """
     params = {
         "src_scene_index": src_scene_index, "dst_scene_index": dst_scene_index,
