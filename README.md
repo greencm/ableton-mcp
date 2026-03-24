@@ -1,9 +1,8 @@
 # AbletonMCP - Ableton Live Model Context Protocol Integration
-[![smithery badge](https://smithery.ai/badge/@ahujasid/ableton-mcp)](https://smithery.ai/server/@ahujasid/ableton-mcp)
 
 AbletonMCP connects Ableton Live to Claude AI through the Model Context Protocol (MCP), allowing Claude to directly interact with and control Ableton Live. This integration enables prompt-assisted music production, track creation, and Live session manipulation.
 
-This is a fork of [closestfriend/ableton-mcp](https://github.com/closestfriend/ableton-mcp) with additional features listed below.
+This is a fork of [ahujasid/ableton-mcp](https://github.com/ahujasid/ableton-mcp) with additional features listed below.
 
 ### Join the Community
 
@@ -25,6 +24,10 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 - **Arrangement recording**: `start_arrangement_recording` with optional `stop_after_beats` parameter — records scene performances into the Arrangement timeline for export, with automatic timed stop
 - **Sidechain routing**: `setup_sidechain` to configure a compressor's sidechain input from another track
 - **Save**: `save_set` and `save_set_as` for saving the Live set
+- **Clip property control**: `get_clip_properties` and `set_clip_properties` — read and write loop settings, markers, color, warp mode, pitch, and more
+- **Track metering**: `get_meters` for instantaneous output levels (dB) across all tracks, and `get_peak_meters` for multi-sample peak detection
+- **Spectrum analysis**: `get_spectrum` reads 7 perceptual frequency bands from a Max for Live device (see [Spectrum Analyzer Setup](#spectrum-analyzer-setup-max-for-live))
+- **Auto-color clips**: Clips created via `compose()` are automatically colored by track role (drums=red, bass=blue, keys=yellow, etc.)
 - **Hot-reload architecture**: The Remote Script is split into a thin bootstrap (`__init__.py`) and a `commands.py` module that can be reloaded without restarting Ableton via the `reload_commands` tool
 - **Ableton 12 compatibility**: Adds `get_capabilities()` required by Ableton 12's control surface loader
 
@@ -37,18 +40,10 @@ The system consists of two main components:
 
 ## Installation
 
-### Installing via Smithery
-
-To install Ableton Live Integration for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@ahujasid/ableton-mcp):
-
-```bash
-npx -y @smithery/cli install @ahujasid/ableton-mcp --client claude
-```
-
 ### Prerequisites
 
-- Ableton Live 10 or newer
-- Python 3.8 or newer
+- **Ableton Live 11 or newer** (requires the Live 11+ MIDI note API for probability, velocity deviation, and release velocity support). Tested on macOS; Windows is untested.
+- Python 3.14 or newer
 - [uv package manager](https://astral.sh/uv)
 
 If you're on Mac, please install uv as:
@@ -103,14 +98,14 @@ uvx ableton-mcp
    - Method 2: If it's not there in the first method, use the direct path (replace XX with your version number):
      `/Users/[Username]/Library/Preferences/Ableton/Live XX/User Remote Scripts`
    
-   **For Windows:**
+   **For Windows (untested):**
    - Method 1:
-     C:\Users\[Username]\AppData\Roaming\Ableton\Live x.x.x\Preferences\User Remote Scripts 
+     `C:\Users\[Username]\AppData\Roaming\Ableton\Live x.x.x\Preferences\User Remote Scripts`
    - Method 2:
      `C:\ProgramData\Ableton\Live XX\Resources\MIDI Remote Scripts\`
    - Method 3:
      `C:\Program Files\Ableton\Live XX\Resources\MIDI Remote Scripts\`
-   *Note: Replace XX with your Ableton version number (e.g., 10, 11, 12)*
+   *Note: Replace XX with your Ableton version number (e.g., 11, 12)*
 
 4. Create a folder called 'AbletonMCP' in the Remote Scripts directory and copy both `__init__.py` and `commands.py` from `AbletonMCP_Remote_Script/` into it
 
@@ -165,6 +160,68 @@ Here are some examples of what you can ask Claude to do:
 - "Set the tempo to 120 BPM"
 - "Play the clip in track 2"
 
+
+## Spectrum Analyzer Setup (Max for Live)
+
+The `get_spectrum` tool reads frequency band levels from a custom Max for Live audio effect. This device splits audio into 7 perceptual bands (Sub, Low, Low-Mid, Mid, High-Mid, High, Air) and exposes their dB levels as device parameters that the MCP can read.
+
+**Requirements:** Ableton Live Suite (includes Max for Live) or Max for Live add-on.
+
+### Setup
+
+1. Copy `m4l/Spectrum-MCP.amxd` to your User Library's Max Audio Effect presets folder:
+   - **macOS:** `~/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/`
+   - **Windows:** `C:\Users\[Username]\Documents\Ableton\User Library\Presets\Audio Effects\Max Audio Effect\`
+2. In Ableton, drag **Spectrum-MCP** from the browser onto the **Master track** (or any track you want to analyze).
+
+That's it — the device is ready to use.
+
+### How It Works
+
+The device passes audio through transparently (no effect on sound) while analyzing 7 frequency bands via bandpass filters (`svf~`), RMS averaging, and dB conversion. Each band's level is exposed as a `live.dial` parameter with **Parameter Visibility** set to "Automated and Stored", which allows the Remote Script to read values through Ableton's device parameter API.
+
+| Band | Frequency Range | Center Freq |
+|------|----------------|-------------|
+| Sub | 20–60 Hz | 40 Hz |
+| Low | 60–250 Hz | 125 Hz |
+| Low-Mid | 250–500 Hz | 350 Hz |
+| Mid | 500–2000 Hz | 1000 Hz |
+| High-Mid | 2000–4000 Hz | 3000 Hz |
+| High | 4000–12000 Hz | 7000 Hz |
+| Air | 12000–20000 Hz | 16000 Hz |
+
+Each band reports its level in dB (range: -60 to +6 dB).
+
+### Usage
+
+Once the device is loaded on a track:
+
+```
+# Read spectrum from master track (default)
+get_spectrum()
+
+# Read spectrum from a specific track
+get_spectrum(track_index=2)
+```
+
+Returns:
+```json
+{
+  "track": "Master",
+  "bands": {
+    "sub": -18.3,
+    "low": -12.1,
+    "low_mid": -8.5,
+    "mid": -6.2,
+    "high_mid": -9.8,
+    "high": -14.3,
+    "air": -22.7
+  },
+  "device": "Spectrum-MCP"
+}
+```
+
+If no spectrum device is found on the track, the tool returns an error message with setup instructions.
 
 ## Troubleshooting
 

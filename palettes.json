@@ -9,26 +9,24 @@
           {"name": "Boom Bap Kit", "notes": "Classic hip-hop drums"},
           {"name": "LDre Cozy Kit", "notes": "Lo-fi oriented kit"}
         ],
-        "effects": [
-          {"name": "Reverb", "role": "space"},
-          {"name": "Vinyl Distortion", "role": "texture"}
-        ]
+        "fx_chain": [
+          {"name": "Reverb", "role": "space", "why": "Short room verb gives drums a lived-in feel",
+           "params": {"Decay Time": "1.2s", "Dry/Wet": "15%"}},
+          {"name": "Vinyl Distortion", "role": "texture", "why": "Crackle and warmth — the lo-fi signature",
+           "params": {"Tracing Model": "30%", "Crackle Volume": "20%"}}
+        ],
+        "fx_avoid": ["Long delay — drums need to stay tight"]
       },
       "keys": {
         "instruments": [
           {"name": "E-Piano Dreamy", "notes": "Collision preset, warm Rhodes feel"},
           {"name": "E-Piano Mellow", "notes": "Soft electric piano"}
         ],
-        "effects": [
-          {"name": "Reverb", "role": "space"},
-          {"name": "Auto Filter", "role": "movement"}
-        ],
-        "effect_chains": [
-          {
-            "name": "Lo-Fi Keys",
-            "chain": ["Reverb", "Auto Filter"],
-            "notes": "Dark hall reverb into slow filter sweep"
-          }
+        "fx_chain": [
+          {"name": "Reverb", "role": "space", "why": "Dark hall reverb for dreamy wash",
+           "params": {"Decay Time": "3.5s", "Dry/Wet": "35%"}},
+          {"name": "Auto Filter", "role": "movement", "why": "Slow filter sweep keeps keys alive",
+           "params": {"Frequency": "2000 Hz", "LFO Amount": "40%", "LFO Rate": "0.1 Hz"}}
         ]
       },
       "bass": {
@@ -36,23 +34,30 @@
           {"name": "Basic Analog Bass", "notes": "Instrument Rack, warm sub"},
           {"name": "Body Bass", "notes": "Deep mellow bass"}
         ],
-        "effects": [
-          {"name": "Auto Filter", "role": "movement"}
-        ]
+        "fx_chain": [
+          {"name": "Auto Filter", "role": "movement", "why": "Gentle envelope for plucky feel",
+           "params": {"Frequency": "800 Hz", "Envelope": "40%"}}
+        ],
+        "fx_avoid": ["Reverb — kills bass definition", "Long delay — muddies the low end"]
       },
       "atmosphere": {
         "instruments": [
           {"name": "Pad Lush", "notes": "Ambient pad texture"},
           {"name": "Pad Warm", "notes": "Soft background pad"}
         ],
-        "effects": [
-          {"name": "Reverb", "role": "space"},
-          {"name": "Delay", "role": "space"}
+        "fx_chain": [
+          {"name": "Reverb", "role": "space", "why": "Long tail for ambient wash",
+           "params": {"Decay Time": "5s", "Dry/Wet": "60%"}},
+          {"name": "Delay", "role": "space", "why": "Ping-pong adds width",
+           "params": {"Feedback": "40%", "Dry/Wet": "30%"}}
         ]
       }
     },
-    "mix_template": {"drums": 0.7, "keys": 0.6, "bass": 0.75, "atmosphere": 0.45}
+    "mix_template": {"drums": 0.7, "keys": 0.6, "bass": 0.75, "atmosphere": 0.45},
+    "chord_vocabulary": ["maj7", "min7", "add9", "sus2"],
+    "rhythm_template": "boom-bap: kick on 1 and 3, snare on 2 and 4 with swing"
   },
+
   "disco_house": {
     "description": "Disco house at 118-126 BPM, funky keys, brass stabs, driving 4-on-the-floor",
     "tempo_range": [118, 126],
@@ -60,18 +65,14 @@
       "keys": {
         "instruments": [
           {"name": "E-Piano MKII Bright", "uri": "query:Synths#Electric:Piano%20&%20Keys:FileId_17302", "notes": "Bright electric piano for disco comps"},
-          {"name": "Clavinet Funky", "notes": "Wah clavinet for funky riffs"}
+          {"name": "Clavinet Funky", "notes": "Wah clavinet for funky riffs"},
+          {"name": "Wurlitzer 200A", "notes": "Grittier, more bark than Rhodes"}
         ],
-        "effects": [
-          {"name": "Chorus-Ensemble", "role": "width"},
-          {"name": "Phaser-Flanger", "role": "movement"}
-        ],
-        "effect_chains": [
-          {
-            "name": "Disco Keys",
-            "chain": ["Chorus-Ensemble", "Phaser-Flanger"],
-            "notes": "Classic chorus into subtle phaser sweep"
-          }
+        "fx_chain": [
+          {"name": "Chorus-Ensemble", "role": "width", "why": "Stereo spread for keys sitting behind the groove",
+           "params": {"Rate": "0.3 Hz", "Amount": "50%"}},
+          {"name": "Phaser-Flanger", "role": "movement", "why": "Classic disco sweep on keys",
+           "params": {"Rate": "0.1 Hz", "Feedback": "40%"}}
         ]
       },
       "horns": {
@@ -79,16 +80,11 @@
           {"name": "Vanguard Brass", "uri": "query:Synths#Drift:Brass:FileId_17402", "notes": "Drift brass preset, disco stabs"},
           {"name": "Brass Section", "notes": "Full brass section sound"}
         ],
-        "effects": [
-          {"name": "Echo", "role": "space"},
-          {"name": "Reverb", "role": "space"}
-        ],
-        "effect_chains": [
-          {
-            "name": "Disco Brass",
-            "chain": ["Echo", "Reverb"],
-            "notes": "Tight echo into hall reverb for brass depth"
-          }
+        "fx_chain": [
+          {"name": "Echo", "role": "space", "why": "Tight echo adds rhythmic depth to stabs",
+           "params": {"Time": "3/16", "Feedback": "25%", "Dry/Wet": "20%"}},
+          {"name": "Reverb", "role": "space", "why": "Hall verb for brass grandeur",
+           "params": {"Decay Time": "2.5s", "Dry/Wet": "25%"}}
         ]
       },
       "bass": {
@@ -96,36 +92,525 @@
           {"name": "Body Bass", "uri": "query:Synths#Instrument%20Rack:Bass:FileId_15437", "notes": "Warm disco bass with body"},
           {"name": "Finger Bass", "notes": "Slapped/fingered bass sound"}
         ],
-        "effects": [
-          {"name": "Auto Filter", "role": "movement"},
-          {"name": "Saturator", "role": "warmth"}
+        "fx_chain": [
+          {"name": "Saturator", "role": "warmth", "why": "Adds harmonics so bass cuts through on small speakers",
+           "params": {"Drive": "4 dB", "Type": "Analog Clip"}},
+          {"name": "Auto Filter", "role": "movement", "why": "Envelope-driven filter for funky plucks",
+           "params": {"Frequency": "800 Hz", "Envelope": "60%"}}
         ],
-        "effect_chains": [
-          {
-            "name": "Disco Bass",
-            "chain": ["Auto Filter", "Saturator"],
-            "notes": "Filter envelope into gentle saturation"
-          }
-        ]
+        "fx_avoid": ["Reverb — kills bass definition", "Long delay — muddies the low end"]
       },
       "drums": {
         "instruments": [
           {"name": "909 Core Kit", "uri": "query:Drums#FileId_15658", "notes": "Classic 909 for house drums"},
           {"name": "707 Kit", "notes": "Vintage 707 disco drums"}
         ],
-        "effects": [
-          {"name": "Drum Buss", "role": "glue"},
-          {"name": "Glue Compressor", "role": "punch"}
+        "fx_chain": [
+          {"name": "Drum Buss", "role": "glue", "why": "Adds pump and warmth to the kit",
+           "params": {"Drive": "30%", "Crunch": "20%", "Boom": "40%"}},
+          {"name": "Glue Compressor", "role": "punch", "why": "Tames peaks, adds punch",
+           "params": {"Threshold": "-15 dB", "Ratio": "4:1", "Attack": "0.1ms"}}
         ],
-        "effect_chains": [
-          {
-            "name": "Disco Drums",
-            "chain": ["Drum Buss", "Glue Compressor"],
-            "notes": "Drum buss for pump into glue comp for punch"
-          }
+        "fx_avoid": ["Heavy reverb — keep drums tight for 4-on-the-floor"]
+      }
+    },
+    "mix_template": {"keys": 0.62, "horns": 0.58, "bass": 0.53, "drums": 0.62},
+    "chord_vocabulary": ["min7", "maj7", "dom7", "sus4"],
+    "rhythm_template": "4-on-the-floor kick, offbeat hats, snare on 2 and 4"
+  },
+
+  "funk": {
+    "description": "Funk at 100-120 BPM, syncopated bass, wah guitar, tight drums, horn stabs",
+    "tempo_range": [100, 120],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "Kit-Big Fish", "notes": "Punchy acoustic funk kit"},
+          {"name": "909 Core Kit", "notes": "Tight electronic option"}
+        ],
+        "fx_chain": [
+          {"name": "Drum Buss", "role": "glue", "why": "Glues the kit together with analog warmth",
+           "params": {"Drive": "25%", "Crunch": "15%"}},
+          {"name": "Compressor", "role": "punch", "why": "Fast attack tames transients for consistency",
+           "params": {"Threshold": "-12 dB", "Ratio": "3:1", "Attack": "0.5ms"}}
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Finger Bass", "notes": "Slapped/fingered for funk"},
+          {"name": "Body Bass", "notes": "Warm alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Saturator", "role": "grit", "why": "Adds bite so bass pops through the mix",
+           "params": {"Drive": "6 dB", "Type": "Medium Curve"}},
+          {"name": "Compressor", "role": "consistency", "why": "Evens out slap dynamics",
+           "params": {"Threshold": "-10 dB", "Ratio": "4:1"}}
+        ],
+        "fx_avoid": ["Reverb", "Chorus — bass needs to stay focused"]
+      },
+      "keys": {
+        "instruments": [
+          {"name": "Clavinet Funky", "notes": "Classic funk wah clav"},
+          {"name": "E-Piano MKII Bright", "notes": "Rhodes comps"}
+        ],
+        "fx_chain": [
+          {"name": "Auto Filter", "role": "wah", "why": "Envelope wah is THE funk keys sound",
+           "params": {"Frequency": "1200 Hz", "Envelope": "80%", "Q": "3"}},
+          {"name": "Phaser-Flanger", "role": "movement", "why": "Adds swirl behind the wah",
+           "params": {"Rate": "0.2 Hz", "Feedback": "30%"}}
+        ]
+      },
+      "horns": {
+        "instruments": [
+          {"name": "Vanguard Brass", "notes": "Punchy brass stabs"},
+          {"name": "Brass Section", "notes": "Full section for hits"}
+        ],
+        "fx_chain": [
+          {"name": "Compressor", "role": "punch", "why": "Tightens stabs for impact",
+           "params": {"Threshold": "-8 dB", "Ratio": "6:1", "Attack": "0.1ms"}},
+          {"name": "Reverb", "role": "space", "why": "Small room, keeps it tight",
+           "params": {"Decay Time": "0.8s", "Dry/Wet": "12%"}}
         ]
       }
     },
-    "mix_template": {"keys": 0.62, "horns": 0.58, "bass": 0.53, "drums": 0.62}
+    "mix_template": {"drums": 0.72, "bass": 0.68, "keys": 0.58, "horns": 0.55},
+    "chord_vocabulary": ["dom7", "min7", "dom9", "13"],
+    "rhythm_template": "syncopated 16th-note grooves, ghost notes on snare, one-drop kick patterns"
+  },
+
+  "synthwave": {
+    "description": "Synthwave at 100-130 BPM, analog pads, arpeggiated synths, gated reverb drums",
+    "tempo_range": [100, 130],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "LinnDrum Kit", "notes": "Classic 80s drum machine"},
+          {"name": "909 Core Kit", "notes": "Punchy electronic alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "gated-verb", "why": "THE 80s drum sound — big gated reverb",
+           "params": {"Decay Time": "1.5s", "Dry/Wet": "40%"}},
+          {"name": "Drum Buss", "role": "punch", "why": "Adds weight to the kit",
+           "params": {"Drive": "20%", "Boom": "50%"}}
+        ]
+      },
+      "pad": {
+        "instruments": [
+          {"name": "Pad Lush", "notes": "Wide analog pad"},
+          {"name": "Pad Warm", "notes": "Soft sustained texture"}
+        ],
+        "fx_chain": [
+          {"name": "Chorus-Ensemble", "role": "width", "why": "Classic Juno-style chorus for wide pads",
+           "params": {"Rate": "0.5 Hz", "Amount": "60%"}},
+          {"name": "Reverb", "role": "space", "why": "Large hall for epic feel",
+           "params": {"Decay Time": "4s", "Dry/Wet": "45%"}}
+        ]
+      },
+      "lead": {
+        "instruments": [
+          {"name": "Saw Lead", "notes": "Classic saw synth lead"},
+          {"name": "Pulse Lead", "notes": "Pulse wave for retro feel"}
+        ],
+        "fx_chain": [
+          {"name": "Delay", "role": "space", "why": "Dotted-eighth delay for rhythmic interest",
+           "params": {"Time": "3/16", "Feedback": "35%", "Dry/Wet": "25%"}},
+          {"name": "Reverb", "role": "depth", "why": "Plate reverb for lead sheen",
+           "params": {"Decay Time": "2s", "Dry/Wet": "20%"}}
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Basic Analog Bass", "notes": "Fat mono synth bass"},
+          {"name": "Body Bass", "notes": "Deep sub alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Saturator", "role": "warmth", "why": "Analog warmth and harmonics",
+           "params": {"Drive": "5 dB", "Type": "Analog Clip"}}
+        ],
+        "fx_avoid": ["Reverb", "Chorus — bass must stay mono and tight"]
+      }
+    },
+    "mix_template": {"drums": 0.68, "pad": 0.50, "lead": 0.62, "bass": 0.70},
+    "chord_vocabulary": ["min", "maj", "sus4", "min7"],
+    "rhythm_template": "straight 8ths, 4-on-the-floor kick, gated snare on 2 and 4"
+  },
+
+  "jazz_trio": {
+    "description": "Jazz trio at 120-160 BPM, walking bass, comping piano, brush drums",
+    "tempo_range": [120, 160],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "Kit-Brushes", "notes": "Brush kit for jazz feel"},
+          {"name": "Kit-Big Fish", "notes": "Acoustic kit alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "room", "why": "Natural room ambience for acoustic feel",
+           "params": {"Decay Time": "1.0s", "Dry/Wet": "18%"}}
+        ],
+        "fx_avoid": ["Distortion", "Heavy compression — jazz drums need dynamics"]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Upright Bass", "notes": "Acoustic upright for walking lines"},
+          {"name": "Finger Bass", "notes": "Electric alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Compressor", "role": "evenness", "why": "Light compression to even out walking line dynamics",
+           "params": {"Threshold": "-15 dB", "Ratio": "2:1"}}
+        ],
+        "fx_avoid": ["Reverb — upright bass gets muddy fast", "Distortion"]
+      },
+      "keys": {
+        "instruments": [
+          {"name": "Grand Piano", "notes": "Acoustic grand for comping"},
+          {"name": "E-Piano Dreamy", "notes": "Rhodes for smoother feel"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "space", "why": "Concert hall ambience",
+           "params": {"Decay Time": "2s", "Dry/Wet": "20%"}}
+        ]
+      }
+    },
+    "mix_template": {"drums": 0.65, "bass": 0.70, "keys": 0.60},
+    "chord_vocabulary": ["maj7", "min7", "dom7", "dim7", "m7b5", "min9", "13"],
+    "rhythm_template": "swing feel, walking bass quarter notes, ride cymbal pattern, comping on 2 and 4"
+  },
+
+  "ambient": {
+    "description": "Ambient at 60-90 BPM, evolving textures, granular pads, sparse melodic fragments",
+    "tempo_range": [60, 90],
+    "tracks": {
+      "pad": {
+        "instruments": [
+          {"name": "Granulator III", "notes": "Granular synthesis for evolving textures"},
+          {"name": "Pad Lush", "notes": "Sustained warm pad"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "space", "why": "Very long tail — pads should float in space",
+           "params": {"Decay Time": "8s", "Dry/Wet": "70%"}},
+          {"name": "Delay", "role": "diffusion", "why": "Feedback delay creates evolving textures",
+           "params": {"Feedback": "60%", "Dry/Wet": "40%"}}
+        ]
+      },
+      "atmosphere": {
+        "instruments": [
+          {"name": "Pad Warm", "notes": "Background texture layer"},
+          {"name": "Drift Pad", "notes": "Evolving timbral pad"}
+        ],
+        "fx_chain": [
+          {"name": "Chorus-Ensemble", "role": "width", "why": "Widens the stereo field",
+           "params": {"Rate": "0.1 Hz", "Amount": "70%"}},
+          {"name": "Reverb", "role": "infinite", "why": "Near-infinite reverb for wash",
+           "params": {"Decay Time": "10s", "Dry/Wet": "80%"}}
+        ]
+      },
+      "bells": {
+        "instruments": [
+          {"name": "Majestic FM Bells", "notes": "FM synthesis bells, crystalline"},
+          {"name": "Kalimba", "notes": "Organic bell tone"}
+        ],
+        "fx_chain": [
+          {"name": "Delay", "role": "rhythmic", "why": "Rhythmic echoes from sparse bell hits",
+           "params": {"Time": "1/4", "Feedback": "50%", "Dry/Wet": "35%"}},
+          {"name": "Reverb", "role": "tail", "why": "Long shimmer tail",
+           "params": {"Decay Time": "5s", "Dry/Wet": "45%"}}
+        ]
+      }
+    },
+    "mix_template": {"pad": 0.55, "atmosphere": 0.40, "bells": 0.45},
+    "chord_vocabulary": ["maj7", "add9", "sus2", "min9"],
+    "rhythm_template": "free/sparse — no strict grid, notes placed organically"
+  },
+
+  "techno": {
+    "description": "Techno at 125-140 BPM, driving kick, acid bass, industrial textures",
+    "tempo_range": [125, 140],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "909 Core Kit", "notes": "The techno drum machine"},
+          {"name": "808 Kit", "notes": "Heavier kick alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Drum Buss", "role": "drive", "why": "Adds industrial grit and pump",
+           "params": {"Drive": "40%", "Crunch": "30%", "Boom": "60%"}},
+          {"name": "Compressor", "role": "slam", "why": "Aggressive compression for relentless energy",
+           "params": {"Threshold": "-20 dB", "Ratio": "8:1", "Attack": "0.1ms"}}
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Basic Analog Bass", "notes": "Acid-style mono bass"},
+          {"name": "Wavetable Bass", "notes": "Morphing bass sound"}
+        ],
+        "fx_chain": [
+          {"name": "Auto Filter", "role": "acid", "why": "Resonant filter sweep — acid techno signature",
+           "params": {"Frequency": "600 Hz", "Resonance": "70%", "LFO Rate": "1/8"}},
+          {"name": "Saturator", "role": "drive", "why": "Overdriven harmonics for aggression",
+           "params": {"Drive": "10 dB", "Type": "Hard Curve"}}
+        ],
+        "fx_avoid": ["Reverb", "Chorus"]
+      },
+      "lead": {
+        "instruments": [
+          {"name": "Saw Lead", "notes": "Harsh saw for stabs"},
+          {"name": "Noise Synth", "notes": "Industrial texture"}
+        ],
+        "fx_chain": [
+          {"name": "Delay", "role": "rhythmic", "why": "Synced delay creates rhythmic complexity",
+           "params": {"Time": "3/16", "Feedback": "45%", "Dry/Wet": "30%"}},
+          {"name": "Reverb", "role": "space", "why": "Dark plate reverb for depth",
+           "params": {"Decay Time": "1.5s", "Dry/Wet": "15%"}}
+        ]
+      }
+    },
+    "mix_template": {"drums": 0.75, "bass": 0.70, "lead": 0.55},
+    "chord_vocabulary": ["min", "sus4", "5ths only"],
+    "rhythm_template": "relentless 4-on-the-floor, offbeat hats, minimal snare"
+  },
+
+  "bossa_nova": {
+    "description": "Bossa nova at 130-150 BPM, nylon guitar feel, soft percussion, warm bass",
+    "tempo_range": [130, 150],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "Kit-Brushes", "notes": "Soft brush work"},
+          {"name": "Percussion Latin", "notes": "Shaker and conga"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "room", "why": "Intimate club room ambience",
+           "params": {"Decay Time": "0.8s", "Dry/Wet": "15%"}}
+        ],
+        "fx_avoid": ["Compression — bossa drums need to breathe"]
+      },
+      "keys": {
+        "instruments": [
+          {"name": "Grand Piano", "notes": "Acoustic piano for bossa comps"},
+          {"name": "E-Piano Dreamy", "notes": "Softer Rhodes alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "space", "why": "Warm hall for piano",
+           "params": {"Decay Time": "2s", "Dry/Wet": "22%"}},
+          {"name": "Chorus-Ensemble", "role": "warmth", "why": "Subtle chorus for richness",
+           "params": {"Rate": "0.2 Hz", "Amount": "25%"}}
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Upright Bass", "notes": "Warm acoustic bass"},
+          {"name": "Finger Bass", "notes": "Soft fingered electric"}
+        ],
+        "fx_chain": [
+          {"name": "Compressor", "role": "evenness", "why": "Gentle compression for smooth walking lines",
+           "params": {"Threshold": "-12 dB", "Ratio": "2:1"}}
+        ],
+        "fx_avoid": ["Reverb", "Distortion"]
+      }
+    },
+    "mix_template": {"drums": 0.55, "keys": 0.60, "bass": 0.65},
+    "chord_vocabulary": ["maj7", "min7", "dom7", "dim", "add9", "6"],
+    "rhythm_template": "bossa clave: dotted patterns, anticipations, soft shuffle"
+  },
+
+  "afrobeat": {
+    "description": "Afrobeat at 110-130 BPM, polyrhythmic drums, horn riffs, driving guitar",
+    "tempo_range": [110, 130],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "Kit-Big Fish", "notes": "Full acoustic kit"},
+          {"name": "Percussion Latin", "notes": "Congas, shaker layers"}
+        ],
+        "fx_chain": [
+          {"name": "Compressor", "role": "glue", "why": "Glues polyrhythmic layers together",
+           "params": {"Threshold": "-10 dB", "Ratio": "3:1"}},
+          {"name": "Reverb", "role": "room", "why": "Live room feel",
+           "params": {"Decay Time": "0.6s", "Dry/Wet": "10%"}}
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Finger Bass", "notes": "Driving fingered bass"},
+          {"name": "Body Bass", "notes": "Sub-heavy alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Saturator", "role": "presence", "why": "Upper harmonics help bass cut through busy mix",
+           "params": {"Drive": "4 dB", "Type": "Analog Clip"}}
+        ],
+        "fx_avoid": ["Reverb", "Heavy delay"]
+      },
+      "keys": {
+        "instruments": [
+          {"name": "E-Piano MKII Bright", "notes": "Bright Rhodes for comping"},
+          {"name": "Organ B3", "notes": "Hammond for sustained chords"}
+        ],
+        "fx_chain": [
+          {"name": "Auto Filter", "role": "wah", "why": "Rhythmic wah adds funk to comps",
+           "params": {"Frequency": "1500 Hz", "Envelope": "50%"}},
+          {"name": "Chorus-Ensemble", "role": "width", "why": "Stereo spread",
+           "params": {"Rate": "0.3 Hz", "Amount": "40%"}}
+        ]
+      },
+      "horns": {
+        "instruments": [
+          {"name": "Vanguard Brass", "notes": "Horn section riffs"},
+          {"name": "Brass Section", "notes": "Full brass"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "space", "why": "Medium room for live feel",
+           "params": {"Decay Time": "1.2s", "Dry/Wet": "18%"}}
+        ]
+      }
+    },
+    "mix_template": {"drums": 0.72, "bass": 0.68, "keys": 0.58, "horns": 0.55},
+    "chord_vocabulary": ["dom7", "min7", "dom9", "sus4"],
+    "rhythm_template": "polyrhythmic, interlocking bell pattern + kick, 12/8 feel"
+  },
+
+  "trap": {
+    "description": "Trap at 130-170 BPM (half-time feel), 808 bass, hi-hat rolls, dark pads",
+    "tempo_range": [130, 170],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "808 Kit", "notes": "Heavy 808 with tuned kick"},
+          {"name": "Trap Kit", "notes": "Modern trap percussion"}
+        ],
+        "fx_chain": [
+          {"name": "Drum Buss", "role": "weight", "why": "Adds massive low-end weight to 808s",
+           "params": {"Drive": "15%", "Boom": "70%"}},
+          {"name": "Compressor", "role": "punch", "why": "Makes the kick and snare hit hard",
+           "params": {"Threshold": "-15 dB", "Ratio": "6:1"}}
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "808 Sub", "notes": "Tuned 808 bass — this IS the bass"},
+          {"name": "Basic Analog Bass", "notes": "Mono synth alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Saturator", "role": "audibility", "why": "Harmonics make 808 audible on phone speakers",
+           "params": {"Drive": "8 dB", "Type": "Analog Clip"}}
+        ],
+        "fx_avoid": ["Reverb", "Delay", "Chorus — 808 must be bone dry"]
+      },
+      "pad": {
+        "instruments": [
+          {"name": "Pad Dark", "notes": "Dark atmospheric pad"},
+          {"name": "Pad Warm", "notes": "Warmer option"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "atmosphere", "why": "Big dark reverb for mood",
+           "params": {"Decay Time": "4s", "Dry/Wet": "50%"}},
+          {"name": "Auto Filter", "role": "movement", "why": "Slow sweep adds life",
+           "params": {"Frequency": "3000 Hz", "LFO Rate": "0.05 Hz"}}
+        ]
+      }
+    },
+    "mix_template": {"drums": 0.75, "bass": 0.72, "pad": 0.40},
+    "chord_vocabulary": ["min", "min7", "dim"],
+    "rhythm_template": "half-time feel, hi-hat triplet rolls, sparse kick, hard snare on 3"
+  },
+
+  "film_score": {
+    "description": "Cinematic/film score, tempo varies, orchestral layers, emotional dynamics",
+    "tempo_range": [60, 120],
+    "tracks": {
+      "strings": {
+        "instruments": [
+          {"name": "Orchestral Strings", "notes": "Full string section"},
+          {"name": "Pad Lush", "notes": "Synth strings alternative"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "hall", "why": "Concert hall reverb for orchestral depth",
+           "params": {"Decay Time": "3.5s", "Dry/Wet": "35%"}}
+        ]
+      },
+      "keys": {
+        "instruments": [
+          {"name": "Grand Piano", "notes": "Solo piano for emotional passages"},
+          {"name": "Celesta", "notes": "Music box quality for delicate moments"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "space", "why": "Medium hall for piano in orchestral context",
+           "params": {"Decay Time": "2.5s", "Dry/Wet": "28%"}}
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Orchestral Bass", "notes": "Low cello/contrabass"},
+          {"name": "Body Bass", "notes": "Synth sub layer"}
+        ],
+        "fx_chain": [
+          {"name": "Compressor", "role": "control", "why": "Gentle compression for consistent low end",
+           "params": {"Threshold": "-12 dB", "Ratio": "2:1"}}
+        ],
+        "fx_avoid": ["Reverb on sub frequencies", "Distortion"]
+      },
+      "atmosphere": {
+        "instruments": [
+          {"name": "Granulator III", "notes": "Textural layers"},
+          {"name": "Pad Warm", "notes": "Ambient bed"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "depth", "why": "Huge reverb for cinematic scale",
+           "params": {"Decay Time": "6s", "Dry/Wet": "55%"}},
+          {"name": "Delay", "role": "diffusion", "why": "Builds density in sparse sections",
+           "params": {"Feedback": "50%", "Dry/Wet": "30%"}}
+        ]
+      }
+    },
+    "mix_template": {"strings": 0.62, "keys": 0.58, "bass": 0.65, "atmosphere": 0.42},
+    "chord_vocabulary": ["maj", "min", "aug", "dim", "maj7", "min7", "sus4", "sus2"],
+    "rhythm_template": "free tempo, rubato passages, accelerando/ritardando"
+  },
+
+  "indie_rock": {
+    "description": "Indie rock at 120-140 BPM, jangly guitars, driving drums, melodic bass",
+    "tempo_range": [120, 140],
+    "tracks": {
+      "drums": {
+        "instruments": [
+          {"name": "Kit-Big Fish", "notes": "Room-miked acoustic kit"},
+          {"name": "Kit-Standard", "notes": "Clean acoustic kit"}
+        ],
+        "fx_chain": [
+          {"name": "Reverb", "role": "room", "why": "Natural room sound, not too processed",
+           "params": {"Decay Time": "0.8s", "Dry/Wet": "15%"}},
+          {"name": "Compressor", "role": "glue", "why": "Light bus compression for cohesion",
+           "params": {"Threshold": "-8 dB", "Ratio": "2:1"}}
+        ]
+      },
+      "bass": {
+        "instruments": [
+          {"name": "Finger Bass", "notes": "Melodic fingered bass"},
+          {"name": "Body Bass", "notes": "Warmer option"}
+        ],
+        "fx_chain": [
+          {"name": "Compressor", "role": "consistency", "why": "Evens out melodic bass dynamics",
+           "params": {"Threshold": "-10 dB", "Ratio": "3:1"}},
+          {"name": "Saturator", "role": "grit", "why": "Light overdrive for rock edge",
+           "params": {"Drive": "3 dB", "Type": "Soft Sine"}}
+        ],
+        "fx_avoid": ["Reverb", "Heavy delay"]
+      },
+      "keys": {
+        "instruments": [
+          {"name": "E-Piano Dreamy", "notes": "Jangly clean keys"},
+          {"name": "Grand Piano", "notes": "Acoustic piano"}
+        ],
+        "fx_chain": [
+          {"name": "Chorus-Ensemble", "role": "jangle", "why": "Classic indie shimmer",
+           "params": {"Rate": "0.4 Hz", "Amount": "45%"}},
+          {"name": "Delay", "role": "space", "why": "Dotted-eighth for rhythmic interest",
+           "params": {"Time": "3/16", "Feedback": "30%", "Dry/Wet": "20%"}}
+        ]
+      }
+    },
+    "mix_template": {"drums": 0.70, "bass": 0.68, "keys": 0.58},
+    "chord_vocabulary": ["maj", "min", "sus4", "add9", "maj7"],
+    "rhythm_template": "straight 8ths, driving kick, open hi-hat on upbeats"
   }
 }

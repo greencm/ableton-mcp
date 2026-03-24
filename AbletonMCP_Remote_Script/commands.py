@@ -2,7 +2,10 @@
 # Each handler is: handle_<command_type>(surface, params) -> dict
 # `surface` is the AbletonMCP ControlSurface instance.
 from __future__ import absolute_import, print_function, unicode_literals
+import math
+import time
 import traceback
+import Live
 
 
 # ── Helpers ─────────────────────────────────────────────────────
@@ -45,6 +48,41 @@ def _get_device_type(device):
     except:
         pass
     return "unknown"
+
+
+def _meter_reading(track):
+    """Read output meter levels from a track, return dict with left/right/peak/db."""
+    try:
+        left = track.output_meter_left
+        right = track.output_meter_right
+        peak = max(left, right)
+        db = round(20.0 * math.log10(peak), 1) if peak > 0.0 else -100.0
+        return {"left": round(left, 4), "right": round(right, 4),
+                "peak": round(peak, 4), "db": db}
+    except Exception:
+        return {"left": 0.0, "right": 0.0, "peak": 0.0, "db": -100.0}
+
+
+# Color mapping for auto-color clips by track role
+_ROLE_COLORS = {
+    "drums": 69, "drum": 69, "perc": 69,       # red
+    "bass": 50,                                   # blue
+    "keys": 14, "piano": 14, "organ": 14,        # yellow
+    "pad": 26, "pads": 26,                        # green
+    "lead": 60, "synth": 60,                      # purple
+    "vocal": 35, "vox": 35, "voice": 35,          # cyan
+    "fx": 42, "sfx": 42, "noise": 42,             # orange
+    "guitar": 18, "gtr": 18,                      # warm yellow
+}
+
+
+def _detect_role_color(track_name):
+    """Return a color_index based on track name keywords, or None."""
+    name_lower = track_name.lower()
+    for keyword, color in _ROLE_COLORS.items():
+        if keyword in name_lower:
+            return color
+    return None
 
 
 def _find_browser_item_by_uri(browser_or_item, uri, max_depth=10, depth=0):
@@ -211,55 +249,75 @@ def handle_delete_clip(surface, params):
 
 
 def _parse_notes(notes):
-    """Parse notes from either dict or abbreviated [pitch, time, dur, vel] format."""
-    live_notes = []
+    """Parse notes into MidiNoteSpecification objects (Live 11+ API).
+
+    Supports abbreviated tuples: [pitch, time, dur, vel, probability]
+    or dicts with keys: pitch, start_time, duration, velocity, mute,
+    probability (0.0-1.0), velocity_deviation (-127 to 127),
+    release_velocity (0-127).
+    """
+    specs = []
     for n in notes:
         if isinstance(n, (list, tuple)):
-            live_notes.append((
-                n[0],                                   # pitch
-                n[1],                                   # start_time
-                n[2] if len(n) > 2 else 0.25,           # duration
-                n[3] if len(n) > 3 else 100,            # velocity
-                False                                    # mute
+            specs.append(Live.Clip.MidiNoteSpecification(
+                pitch=int(n[0]),
+                start_time=float(n[1]),
+                duration=float(n[2]) if len(n) > 2 else 0.25,
+                velocity=float(n[3]) if len(n) > 3 else 100.0,
+                mute=False,
+                probability=float(n[4]) if len(n) > 4 else 1.0,
+                velocity_deviation=float(n[5]) if len(n) > 5 else 0.0,
+                release_velocity=int(n[6]) if len(n) > 6 else 0,
             ))
         else:
-            live_notes.append((
-                n.get("pitch", 60),
-                n.get("start_time", 0.0),
-                n.get("duration", 0.25),
-                n.get("velocity", 100),
-                n.get("mute", False)
+            specs.append(Live.Clip.MidiNoteSpecification(
+                pitch=int(n.get("pitch", 60)),
+                start_time=float(n.get("start_time", 0.0)),
+                duration=float(n.get("duration", 0.25)),
+                velocity=float(n.get("velocity", 100)),
+                mute=bool(n.get("mute", False)),
+                probability=float(n.get("probability", 1.0)),
+                velocity_deviation=float(n.get("velocity_deviation", 0.0)),
+                release_velocity=int(n.get("release_velocity", 0)),
             ))
-    return live_notes
+    return specs
 
 
 def handle_add_notes_to_clip(surface, params):
     slot, clip = _get_clip(surface, params)
     notes = params.get("notes", [])
-    live_notes = _parse_notes(notes)
-    clip.set_notes(tuple(live_notes))
+    specs = _parse_notes(notes)
+    clip.add_new_notes(tuple(specs))
     return {"note_count": len(notes)}
 
 
 def handle_get_clip_notes(surface, params):
     slot, clip = _get_clip(surface, params)
-    notes = clip.get_notes(0.0, 0, clip.length, 128)
+    notes = clip.get_notes_extended(from_pitch=0, pitch_span=128,
+                                    from_time=0.0, time_span=clip.length)
     result = []
     for note in notes:
-        result.append({
-            "pitch": note[0],
-            "start_time": note[1],
-            "duration": note[2],
-            "velocity": note[3],
-            "mute": note[4]
-        })
+        entry = {
+            "pitch": note.pitch,
+            "start_time": note.start_time,
+            "duration": note.duration,
+            "velocity": note.velocity,
+            "mute": note.mute,
+        }
+        if note.probability < 1.0:
+            entry["probability"] = round(note.probability, 2)
+        if note.velocity_deviation != 0.0:
+            entry["velocity_deviation"] = round(note.velocity_deviation, 1)
+        if note.release_velocity != 0:
+            entry["release_velocity"] = note.release_velocity
+        result.append(entry)
     return {"notes": result, "clip_name": clip.name, "clip_length": clip.length}
 
 
 def handle_clear_notes(surface, params):
     slot, clip = _get_clip(surface, params)
-    clip.select_all_notes()
-    clip.replace_selected_notes(tuple())
+    clip.remove_notes_extended(from_pitch=0, pitch_span=128,
+                               from_time=0.0, time_span=clip.length)
     return {"cleared": True, "clip_name": clip.name}
 
 
@@ -268,6 +326,89 @@ def handle_set_clip_name(surface, params):
     name = params.get("name", "")
     clip.name = name
     return {"name": clip.name}
+
+
+def handle_get_clip_properties(surface, params):
+    """Return all readable properties of a clip."""
+    track = _get_track(surface, params)
+    slot, clip = _get_clip(surface, params)
+    is_audio = track.has_audio_input
+
+    props = {
+        "name": clip.name,
+        "length": clip.length,
+        "looping": clip.looping,
+        "loop_start": clip.loop_start,
+        "loop_end": clip.loop_end,
+        "start_marker": clip.start_marker,
+        "end_marker": clip.end_marker,
+        "color_index": clip.color_index,
+        "signature_numerator": clip.signature_numerator,
+        "signature_denominator": clip.signature_denominator,
+        "is_playing": clip.is_playing,
+        "is_recording": clip.is_recording,
+        "is_audio": is_audio,
+    }
+
+    try:
+        props["velocity_amount"] = clip.velocity_amount
+    except Exception:
+        pass
+
+    if is_audio:
+        try:
+            props["warping"] = clip.warping
+            props["warp_mode"] = clip.warp_mode
+            props["pitch_coarse"] = clip.pitch_coarse
+            props["pitch_fine"] = clip.pitch_fine
+        except Exception:
+            pass
+
+    return props
+
+
+# Whitelist of settable clip properties with type coercion
+_CLIP_SETTABLE = {
+    "looping": bool, "loop_start": float, "loop_end": float,
+    "start_marker": float, "end_marker": float,
+    "color_index": int, "velocity_amount": float, "name": str,
+    "signature_numerator": int, "signature_denominator": int,
+}
+_CLIP_AUDIO_SETTABLE = {
+    "warping": bool, "warp_mode": int, "pitch_coarse": int, "pitch_fine": float,
+}
+
+
+def handle_set_clip_properties(surface, params):
+    """Set one or more clip properties from a dict."""
+    track = _get_track(surface, params)
+    slot, clip = _get_clip(surface, params)
+    is_audio = track.has_audio_input
+    properties = params.get("properties", {})
+
+    if not properties:
+        raise ValueError("No properties provided")
+
+    applied = {}
+    errors = {}
+    all_settable = dict(_CLIP_SETTABLE)
+    if is_audio:
+        all_settable.update(_CLIP_AUDIO_SETTABLE)
+
+    for key, value in properties.items():
+        if key not in all_settable:
+            errors[key] = "Unknown or read-only property"
+            continue
+        try:
+            setattr(clip, key, all_settable[key](value))
+            applied[key] = getattr(clip, key)
+        except Exception as e:
+            errors[key] = str(e)
+
+    result = {"applied": applied, "clip_name": clip.name}
+    if errors:
+        result["errors"] = errors
+    return result
 
 
 # ── Transport ───────────────────────────────────────────────────
@@ -763,6 +904,281 @@ def handle_setup_sidechain(surface, params):
     }
 
 
+# ── Meters & Spectrum ─────────────────────────────────────────
+
+def handle_get_meters(surface, params):
+    """Return current output meter levels for tracks, returns, and master."""
+    song = _get_song(surface)
+    track_index = params.get("track_index")
+    ts = int(time.time() * 1000)
+
+    if track_index is not None:
+        track = _get_track(surface, params)
+        return {
+            "track_index": track_index,
+            "name": track.name,
+            "meters": _meter_reading(track),
+            "is_playing": song.is_playing,
+            "timestamp": ts,
+        }
+
+    tracks = []
+    for i, track in enumerate(song.tracks):
+        tracks.append({"index": i, "name": track.name, "meters": _meter_reading(track)})
+
+    returns = []
+    for i, track in enumerate(song.return_tracks):
+        returns.append({"index": i, "name": track.name, "meters": _meter_reading(track)})
+
+    return {
+        "tracks": tracks,
+        "returns": returns,
+        "master": _meter_reading(song.master_track),
+        "is_playing": song.is_playing,
+        "timestamp": ts,
+    }
+
+
+# Peak meter accumulation state (module-level, reset on hot-reload)
+_peak_data = {}
+_peak_sampling = False
+
+
+def handle_start_peak_meter(surface, params):
+    """Start accumulating peak meter data over multiple samples."""
+    global _peak_data, _peak_sampling
+    song = _get_song(surface)
+    num_samples = min(params.get("samples", 10), 50)
+    interval_ms = max(params.get("interval_ms", 50), 20)
+    reset = params.get("reset", True)
+
+    if _peak_sampling and not reset:
+        return {"error": "Peak metering already in progress. Use reset=true to restart."}
+
+    _peak_data = {}
+    _peak_sampling = True
+
+    # Initialize accumulators
+    for i, track in enumerate(song.tracks):
+        _peak_data[("track", i)] = {"name": track.name, "peak_left": 0.0, "peak_right": 0.0}
+    for i, track in enumerate(song.return_tracks):
+        _peak_data[("return", i)] = {"name": track.name, "peak_left": 0.0, "peak_right": 0.0}
+    _peak_data[("master", 0)] = {"name": "Master", "peak_left": 0.0, "peak_right": 0.0}
+
+    def sample(remaining):
+        global _peak_sampling
+        if remaining <= 0 or not _peak_sampling:
+            _peak_sampling = False
+            return
+        for i, track in enumerate(song.tracks):
+            d = _peak_data.get(("track", i))
+            if d:
+                try:
+                    d["peak_left"] = max(d["peak_left"], track.output_meter_left)
+                    d["peak_right"] = max(d["peak_right"], track.output_meter_right)
+                except Exception:
+                    pass
+        for i, track in enumerate(song.return_tracks):
+            d = _peak_data.get(("return", i))
+            if d:
+                try:
+                    d["peak_left"] = max(d["peak_left"], track.output_meter_left)
+                    d["peak_right"] = max(d["peak_right"], track.output_meter_right)
+                except Exception:
+                    pass
+        d = _peak_data.get(("master", 0))
+        if d:
+            try:
+                d["peak_left"] = max(d["peak_left"], song.master_track.output_meter_left)
+                d["peak_right"] = max(d["peak_right"], song.master_track.output_meter_right)
+            except Exception:
+                pass
+        surface.schedule_message(interval_ms, lambda: sample(remaining - 1))
+
+    sample(num_samples)
+
+    return {
+        "started": True,
+        "samples": num_samples,
+        "interval_ms": interval_ms,
+        "estimated_duration_ms": num_samples * interval_ms,
+    }
+
+
+def handle_get_peak_meters(surface, params):
+    """Read accumulated peak meter data."""
+    global _peak_data, _peak_sampling
+
+    if not _peak_data:
+        return {"error": "No peak data collected. Call start_peak_meter first."}
+
+    tracks = []
+    returns = []
+    master = None
+
+    for key in sorted(_peak_data.keys()):
+        data = _peak_data[key]
+        kind, idx = key
+        peak = max(data["peak_left"], data["peak_right"])
+        db = round(20.0 * math.log10(peak), 1) if peak > 0.0 else -100.0
+        entry = {
+            "index": idx,
+            "name": data["name"],
+            "peak_left": round(data["peak_left"], 4),
+            "peak_right": round(data["peak_right"], 4),
+            "peak": round(peak, 4),
+            "db": db,
+        }
+        if kind == "track":
+            tracks.append(entry)
+        elif kind == "return":
+            returns.append(entry)
+        elif kind == "master":
+            master = entry
+
+    return {
+        "tracks": tracks,
+        "returns": returns,
+        "master": master,
+        "still_sampling": _peak_sampling,
+        "timestamp": int(time.time() * 1000),
+    }
+
+
+SPECTRUM_BANDS = ["Sub", "Low", "Low-Mid", "Mid", "High-Mid", "High", "Air"]
+
+
+def handle_get_spectrum(surface, params):
+    """Read frequency band levels from M4L SpectrumAnalyzer device."""
+    track_index = params.get("track_index")
+    song = _get_song(surface)
+    track = song.master_track if track_index is None else _get_track(surface, params)
+
+    for device in track.devices:
+        try:
+            param_names = {p.name for p in device.parameters}
+            if all(band in param_names for band in SPECTRUM_BANDS):
+                bands = {}
+                for p in device.parameters:
+                    if p.name in SPECTRUM_BANDS:
+                        bands[p.name.lower().replace("-", "_")] = round(p.value, 1)
+                return {"track": track.name, "bands": bands, "device": device.name}
+        except Exception:
+            continue
+
+    return {"error": "No spectrum analyzer found on track. Load SpectrumAnalyzer M4L device."}
+
+
+# ── Snapshot ───────────────────────────────────────────────────
+# Aggregates get_session_info + get_track_info + get_clip_notes + device params
+# for ALL tracks in one call.  Runs on main thread.  Caps at 100 populated clips.
+
+def handle_snapshot(surface, params):
+    """Return the entire session state in a single call.
+
+    Includes: tempo, signature, all tracks with devices (+ key params),
+    all clips with MIDI notes.  Capped at 100 populated clips to keep
+    payload size reasonable — response includes "truncated": true if
+    the cap was hit.
+    """
+    song = _get_song(surface)
+    max_clips = params.get("max_clips", 100)
+    clip_count = 0
+    truncated = False
+
+    tracks = []
+    for ti, track in enumerate(song.tracks):
+        # --- devices with top-level params ---
+        devices = []
+        for di, device in enumerate(track.devices):
+            dev_info = {
+                "index": di,
+                "name": device.name,
+                "class_name": device.class_name,
+                "type": _get_device_type(device),
+            }
+            # Include the first 8 non-trivial parameters per device
+            try:
+                dev_params = {}
+                count = 0
+                for p in device.parameters:
+                    if count >= 8:
+                        break
+                    # Skip the "Device On" toggle — it's always param 0
+                    if p.name == "Device On":
+                        continue
+                    dev_params[p.name] = round(p.value, 4)
+                    count += 1
+                if dev_params:
+                    dev_info["params"] = dev_params
+            except Exception:
+                pass
+            devices.append(dev_info)
+
+        # --- clips with notes ---
+        clips = []
+        for si, slot in enumerate(track.clip_slots):
+            if not slot.has_clip:
+                clips.append(None)
+                continue
+            clip = slot.clip
+            clip_info = {
+                "slot": si,
+                "name": clip.name,
+                "length": clip.length,
+                "looping": clip.looping,
+                "loop_start": clip.loop_start,
+                "loop_end": clip.loop_end,
+                "color_index": clip.color_index,
+            }
+            if clip_count < max_clips:
+                try:
+                    notes = clip.get_notes_extended(from_pitch=0, pitch_span=128,
+                                                     from_time=0.0, time_span=clip.length)
+                    note_list = []
+                    for n in notes:
+                        nd = [n.pitch, round(n.start_time, 4), round(n.duration, 4), n.velocity]
+                        if n.probability < 1.0:
+                            nd.append(round(n.probability, 2))
+                        note_list.append(nd)
+                    clip_info["notes"] = note_list
+                    clip_info["note_count"] = len(note_list)
+                except Exception:
+                    clip_info["notes"] = []
+                    clip_info["note_count"] = 0
+                clip_count += 1
+            else:
+                truncated = True
+                clip_info["note_count"] = "?"
+            clips.append(clip_info)
+
+        tracks.append({
+            "index": ti,
+            "name": track.name,
+            "type": "audio" if track.has_audio_input else "midi",
+            "volume": round(track.mixer_device.volume.value, 4),
+            "pan": round(track.mixer_device.panning.value, 4),
+            "mute": track.mute,
+            "solo": track.solo,
+            "arm": track.arm,
+            "devices": devices,
+            "clips": clips,
+        })
+
+    return {
+        "tempo": song.tempo,
+        "signature": "{0}/{1}".format(song.signature_numerator, song.signature_denominator),
+        "track_count": len(song.tracks),
+        "return_track_count": len(song.return_tracks),
+        "scene_count": len(song.scenes),
+        "is_playing": song.is_playing,
+        "master_volume": round(song.master_track.mixer_device.volume.value, 4),
+        "tracks": tracks,
+        "clip_count": clip_count,
+        "truncated": truncated,
+    }
+
+
 # ── Composite handlers ────────────────────────────────────────
 
 def handle_create_track(surface, params):
@@ -824,8 +1240,8 @@ def handle_write_clip(surface, params):
     clip = slot.clip
 
     if notes:
-        live_notes = _parse_notes(notes)
-        clip.set_notes(tuple(live_notes))
+        specs = _parse_notes(notes)
+        clip.add_new_notes(tuple(specs))
 
     if name:
         clip.name = name
@@ -923,7 +1339,29 @@ def handle_compose(surface, params):
                     "length": op.get("length", 4),
                     "overwrite": op.get("overwrite", False),
                 })
+                # Auto-color clip based on track role
+                try:
+                    track = song.tracks[track_idx]
+                    slot = track.clip_slots[op.get("slot", 0)]
+                    if slot.has_clip:
+                        color = _detect_role_color(track.name)
+                        if color is not None:
+                            slot.clip.color_index = color
+                except Exception:
+                    pass  # Auto-color is best-effort
                 results.append({"op": "clip", "track_index": track_idx, "slot": op.get("slot", 0)})
+
+            elif op_type == "clip_props":
+                track_idx = op.get("track")
+                if isinstance(track_idx, str) and track_idx.startswith("ref:"):
+                    ref = int(track_idx.split(":")[1])
+                    track_idx = created_tracks.get(ref, 0)
+                result = handle_set_clip_properties(surface, {
+                    "track_index": track_idx,
+                    "clip_index": op.get("slot", 0),
+                    "properties": op.get("properties", {}),
+                })
+                results.append({"op": "clip_props", "track_index": track_idx, "result": result})
 
             elif op_type == "mix":
                 handle_set_mix(surface, {"tracks": op.get("tracks", [])})
@@ -974,8 +1412,17 @@ def handle_duplicate_clip(surface, params):
 
     src_clip = src_slot.clip
     dst_slot.create_clip(src_clip.length)
-    notes = src_clip.get_notes(0.0, 0, src_clip.length, 128)
-    dst_slot.clip.set_notes(notes)
+    notes = src_clip.get_notes_extended(from_pitch=0, pitch_span=128,
+                                        from_time=0.0, time_span=src_clip.length)
+    specs = []
+    for n in notes:
+        specs.append(Live.Clip.MidiNoteSpecification(
+            pitch=n.pitch, start_time=n.start_time, duration=n.duration,
+            velocity=n.velocity, mute=n.mute, probability=n.probability,
+            velocity_deviation=n.velocity_deviation,
+            release_velocity=n.release_velocity,
+        ))
+    dst_slot.clip.add_new_notes(tuple(specs))
     dst_slot.clip.name = params.get("name", src_clip.name)
 
     return {
@@ -1009,8 +1456,17 @@ def handle_duplicate_scene(surface, params):
                 continue
         src_clip = src_slot.clip
         dst_slot.create_clip(src_clip.length)
-        notes = src_clip.get_notes(0.0, 0, src_clip.length, 128)
-        dst_slot.clip.set_notes(notes)
+        notes = src_clip.get_notes_extended(from_pitch=0, pitch_span=128,
+                                            from_time=0.0, time_span=src_clip.length)
+        specs = []
+        for n in notes:
+            specs.append(Live.Clip.MidiNoteSpecification(
+                pitch=n.pitch, start_time=n.start_time, duration=n.duration,
+                velocity=n.velocity, mute=n.mute, probability=n.probability,
+                velocity_deviation=n.velocity_deviation,
+                release_velocity=n.release_velocity,
+            ))
+        dst_slot.clip.add_new_notes(tuple(specs))
         dst_slot.clip.name = name_prefix if name_prefix else src_clip.name
         copied.append({"track_index": i, "track_name": track.name,
                         "clip_name": dst_slot.clip.name})

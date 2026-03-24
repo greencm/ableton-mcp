@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__AbletonMCP__get_session_info",
+      "mcp__AbletonMCP__get_browser_tree",
+      "mcp__AbletonMCP__get_browser_items_at_path",
+      "mcp__AbletonMCP__set_tempo",
+      "mcp__AbletonMCP__create_midi_track",
+      "mcp__AbletonMCP__load_instrument_or_effect",
+      "mcp__AbletonMCP__set_track_name",
+      "mcp__AbletonMCP__create_clip",
+      "mcp__AbletonMCP__add_notes_to_clip",
+      "mcp__AbletonMCP__set_clip_name",
+      "mcp__AbletonMCP__fire_clip",
+      "mcp__AbletonMCP__get_track_info",
+      "mcp__AbletonMCP__stop_playback",
+      "mcp__AbletonMCP__start_playback",
+      "Bash(uv run:*)",
+      "mcp__AbletonMCP__start_recording",
+      "Bash(cp:*)",
+      "mcp__AbletonMCP__stop_recording",
+      "mcp__AbletonMCP__fire_scene_sequence",
+      "mcp__AbletonMCP__reload_commands",
+      "mcp__AbletonMCP__search_browser",
+      "mcp__AbletonMCP__compose",
+      "mcp__AbletonMCP__get_device_parameters",
+      "mcp__AbletonMCP__set_device_parameter",
+      "mcp__AbletonMCP__get_clip_notes",
+      "mcp__AbletonMCP__build_index",
+      "Bash(python3:*)",
+      "mcp__AbletonMCP__search_index",
+      "mcp__AbletonMCP__write_clip",
+      "mcp__AbletonMCP__start_arrangement_recording",
+      "mcp__AbletonMCP__create_track",
+      "Bash(/bin/cp:*)",
+      "mcp__AbletonMCP__duplicate_scene",
+      "mcp__AbletonMCP__set_mix",
+      "mcp__AbletonMCP__fire_scene",
+      "mcp__AbletonMCP__duplicate_clip"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "AbletonMCP"
+  ]
+}

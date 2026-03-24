@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, List, Union
 
 from . import style_index
+from . import analysis
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -83,11 +84,12 @@ class AbletonConnection:
         command = {"type": command_type, "params": params or {}}
 
         is_modifying = command_type not in {
-            "get_session_info", "get_track_info",
+            "get_session_info", "get_track_info", "snapshot",
             "get_browser_item", "get_browser_categories", "get_browser_items",
             "get_browser_tree", "get_browser_items_at_path",
             "get_clip_notes", "get_device_parameters", "search_browser",
-            "crawl_browser",
+            "crawl_browser", "get_clip_properties", "get_meters",
+            "get_peak_meters", "get_spectrum",
         }
 
         if timeout is None:
@@ -97,7 +99,7 @@ class AbletonConnection:
             self.sock.sendall(json.dumps(command).encode('utf-8'))
             if is_modifying:
                 import time
-                time.sleep(0.025)
+                time.sleep(0.010)
             self.sock.settimeout(timeout)
             response_data = self.receive_full_response(self.sock, timeout=timeout)
             response = json.loads(response_data.decode('utf-8'))
@@ -105,7 +107,7 @@ class AbletonConnection:
                 raise Exception(response.get("message", "Unknown error"))
             if is_modifying:
                 import time
-                time.sleep(0.025)
+                time.sleep(0.010)
             return response.get("result", {})
         except socket.timeout:
             self.sock = None
@@ -202,6 +204,25 @@ def get_track_info(ctx: Context, track_index: int) -> str:
     NOTE: All indices are 0-based (Ableton UI Track 1 = index 0).
     """
     return json.dumps(_cmd("get_track_info", {"track_index": track_index}), indent=2)
+
+
+# ── Snapshot ──────────────────────────────────────────────────
+
+@mcp.tool()
+def snapshot(ctx: Context) -> str:
+    """
+    Return the entire session state in a single call — all tracks, devices
+    (with key parameters), and clips (with MIDI notes).
+
+    This is the fastest way to understand what's currently in Ableton.
+    Use this instead of calling get_track_info + get_clip_notes for each track.
+
+    Capped at 100 populated clips. If truncated, use get_clip_notes for specific clips.
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0).
+    """
+    result = _cmd("snapshot", timeout=30.0)
+    return json.dumps(result, indent=2)
 
 
 # ── Composite tools (Tier 1) ──────────────────────────────────
@@ -477,6 +498,118 @@ def set_clip_name(ctx: Context, track_index: int, clip_index: int, name: str) ->
     """
     _cmd("set_clip_name", {"track_index": track_index, "clip_index": clip_index, "name": name})
     return f"Renamed clip at track {track_index}, slot {clip_index} to '{name}'"
+
+
+@mcp.tool()
+def get_clip_properties(ctx: Context, track_index: int, clip_index: int) -> str:
+    """
+    Get all properties of a clip including loop settings, markers, color, time signature,
+    and audio-specific properties (warping, pitch) for audio clips.
+
+    Parameters:
+    - track_index: The index of the track containing the clip
+    - clip_index: The index of the clip slot
+
+    NOTE: All indices are 0-based.
+    """
+    return json.dumps(_cmd("get_clip_properties", {
+        "track_index": track_index, "clip_index": clip_index
+    }), indent=2)
+
+
+@mcp.tool()
+def set_clip_properties(ctx: Context, track_index: int, clip_index: int,
+                        properties: Dict[str, Any]) -> str:
+    """
+    Set one or more clip properties in a single call.
+
+    Parameters:
+    - track_index: The track containing the clip
+    - clip_index: The clip slot index
+    - properties: Dict of property names to values. Settable properties:
+        - looping (bool): Loop on/off
+        - loop_start (float): Loop start in beats
+        - loop_end (float): Loop end in beats
+        - start_marker (float): Clip start marker
+        - end_marker (float): Clip end marker
+        - color_index (int): Clip color 0-69
+        - velocity_amount (float): Velocity randomization 0.0-1.0
+        - signature_numerator (int): Time signature numerator
+        - signature_denominator (int): Time signature denominator
+        - name (str): Clip name
+        Audio clips only:
+        - warping (bool): Warp on/off
+        - warp_mode (int): 0=Beats, 1=Tones, 2=Texture, 3=Re-Pitch, 4=Complex, 6=Pro
+        - pitch_coarse (int): Pitch shift in semitones
+        - pitch_fine (float): Fine pitch in cents
+
+    NOTE: All indices are 0-based.
+    """
+    return json.dumps(_cmd("set_clip_properties", {
+        "track_index": track_index, "clip_index": clip_index,
+        "properties": properties
+    }), indent=2)
+
+
+# ── Meters & Spectrum ─────────────────────────────────────────
+
+
+@mcp.tool()
+def get_meters(ctx: Context, track_index: int = None) -> str:
+    """
+    Get current output meter levels for tracks, return tracks, and master.
+    Returns instantaneous left/right levels (0.0-1.0) and dB values.
+
+    Parameters:
+    - track_index: Optional specific track (omit for all tracks)
+
+    NOTE: track_index is 0-based. Levels are instantaneous snapshots;
+    for peak detection use get_peak_meters.
+    """
+    params = {}
+    if track_index is not None:
+        params["track_index"] = track_index
+    return json.dumps(_cmd("get_meters", params), indent=2)
+
+
+@mcp.tool()
+def get_peak_meters(ctx: Context, samples: int = 10, interval_ms: int = 50) -> str:
+    """
+    Sample track output meters multiple times and return peak values.
+    Useful for detecting clipping or comparing track loudness.
+
+    Parameters:
+    - samples: Number of samples to take (default: 10, max: 50)
+    - interval_ms: Milliseconds between samples (default: 50, min: 20)
+
+    Total duration = samples * interval_ms. Keep samples reasonable.
+    """
+    import time
+    start_result = _cmd("start_peak_meter", {
+        "samples": samples, "interval_ms": interval_ms, "reset": True
+    })
+    if "error" in start_result:
+        return json.dumps(start_result, indent=2)
+    wait_ms = start_result.get("estimated_duration_ms", 500)
+    time.sleep((wait_ms + 100) / 1000.0)
+    return json.dumps(_cmd("get_peak_meters"), indent=2)
+
+
+@mcp.tool()
+def get_spectrum(ctx: Context, track_index: int = None) -> str:
+    """
+    Get frequency spectrum data from M4L SpectrumAnalyzer device.
+    Returns 7 perceptual bands in dB: sub, low, low_mid, mid, high_mid, high, air.
+
+    Parameters:
+    - track_index: Track to read spectrum from (default: master track)
+
+    Requires the SpectrumAnalyzer Max for Live device on the target track.
+    """
+    params = {}
+    if track_index is not None:
+        params["track_index"] = track_index
+    return json.dumps(_cmd("get_spectrum", params), indent=2)
 
 
 # ── Transport ───────────────────────────────────────────────────
@@ -827,20 +960,83 @@ def get_palette(ctx: Context, style: str) -> str:
 @mcp.tool()
 def analyze_session(ctx: Context) -> str:
     """
-    Read all tracks' devices and score against each palette.
-    Returns the best matching style and per-palette scores.
+    Analyze the current session musically. Reads all tracks via snapshot,
+    then returns: per-track role detection, key/chord analysis, mix balance,
+    FX audit, energy arc, and style match against palettes.
+
+    Use this to understand what's in the session before giving feedback.
     """
-    session = _cmd("get_session_info")
-    track_count = session.get("track_count", 0)
+    snap = _cmd("snapshot", timeout=30.0)
+    result = analysis.analyze_session_data(snap)
 
-    tracks = []
-    for i in range(track_count):
-        track_info = _cmd("get_track_info", {"track_index": i})
-        tracks.append(track_info)
+    # Also score against palettes
+    tracks_for_palette = []
+    for t in snap.get("tracks", []):
+        tracks_for_palette.append({
+            "name": t.get("name", ""),
+            "devices": t.get("devices", []),
+        })
+    palette_scores = style_index.analyze_session_against_palettes(tracks_for_palette)
+    result["palette_match"] = palette_scores
 
-    result = style_index.analyze_session_against_palettes(tracks)
-    result["track_count"] = track_count
     return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def analyze_clip(ctx: Context, track_index: int, clip_index: int) -> str:
+    """
+    Analyze a specific clip musically — detect key, chords, rhythmic density,
+    energy arc, and register. Returns structured music theory analysis.
+
+    Parameters:
+    - track_index: The track containing the clip
+    - clip_index: The clip slot index
+
+    NOTE: All indices are 0-based (Ableton UI Track 1 = index 0, Scene 1 = clip_index 0).
+    """
+    clip_data = _cmd("get_clip_notes", {
+        "track_index": track_index, "clip_index": clip_index
+    })
+    notes = clip_data.get("notes", [])
+    length = clip_data.get("clip_length", 16.0)
+    clip_name = clip_data.get("clip_name", "")
+
+    # Normalize notes to [pitch, time, dur, vel] format
+    normalized = []
+    for n in notes:
+        if isinstance(n, dict):
+            normalized.append([n["pitch"], n["start_time"], n["duration"], n["velocity"]])
+        else:
+            normalized.append(n)
+
+    result = analysis.analyze_notes(normalized, length)
+    result["clip_name"] = clip_name
+    result["track_index"] = track_index
+    result["clip_index"] = clip_index
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def swap_instrument(ctx: Context, track_index: int, instrument_uri: str) -> str:
+    """
+    Swap the instrument on a track while preserving effects and clips.
+    Loads a new instrument by URI — the previous instrument is replaced
+    but all effects in the chain and all clip data remain intact.
+
+    Use with palette alternatives to try different sounds on the same part.
+
+    Parameters:
+    - track_index: The track to swap the instrument on
+    - instrument_uri: URI of the new instrument to load
+
+    NOTE: track_index is 0-based (Ableton UI Track 1 = index 0).
+    """
+    result = _cmd("load_browser_item", {
+        "track_index": track_index, "item_uri": instrument_uri
+    })
+    if result.get("loaded", False):
+        return f"Swapped instrument to '{result.get('item_name', instrument_uri)}' on track {track_index}. Effects and clips preserved."
+    return f"Failed to load instrument with URI '{instrument_uri}'"
 
 
 # ── Duplicate / Copy ────────────────────────────────────────────
