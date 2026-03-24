@@ -28,6 +28,7 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 - **Track metering**: `get_meters` for instantaneous output levels (dB) across all tracks, and `get_peak_meters` for multi-sample peak detection
 - **Spectrum analysis**: `get_spectrum` reads 7 perceptual frequency bands from a Max for Live device (see [Spectrum Analyzer Setup](#spectrum-analyzer-setup-max-for-live))
 - **Auto-color clips**: Clips created via `compose()` are automatically colored by track role (drums=red, bass=blue, keys=yellow, etc.)
+- **Live 11+ MIDI note API**: Full support for probability, velocity deviation, and release velocity on all MIDI notes — enables humanized grooves and generative variation directly from Claude
 - **Hot-reload architecture**: The Remote Script is split into a thin bootstrap (`__init__.py`) and a `commands.py` module that can be reloaded without restarting Ableton via the `reload_commands` tool
 - **Ableton 12 compatibility**: Adds `get_capabilities()` required by Ableton 12's control surface loader
 
