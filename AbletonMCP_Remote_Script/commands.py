@@ -94,7 +94,8 @@ def _find_browser_item_by_uri(browser_or_item, uri, max_depth=10, depth=0):
         if hasattr(browser_or_item, 'instruments'):
             for cat in [browser_or_item.instruments, browser_or_item.sounds,
                         browser_or_item.drums, browser_or_item.audio_effects,
-                        browser_or_item.midi_effects]:
+                        browser_or_item.midi_effects, browser_or_item.plugins,
+                        browser_or_item.user_library]:
                 item = _find_browser_item_by_uri(cat, uri, max_depth, depth + 1)
                 if item:
                     return item
@@ -640,7 +641,8 @@ def handle_get_browser_items_at_path(surface, params):
     root_category = path_parts[0].lower()
     cat_map = {
         "instruments": "instruments", "sounds": "sounds", "drums": "drums",
-        "audio_effects": "audio_effects", "midi_effects": "midi_effects"
+        "audio_effects": "audio_effects", "midi_effects": "midi_effects",
+        "plugins": "plugins", "user_library": "user_library",
     }
     if root_category in cat_map and hasattr(browser, cat_map[root_category]):
         current_item = getattr(browser, cat_map[root_category])
@@ -743,7 +745,7 @@ def handle_search_browser(surface, params):
             if hasattr(child, 'children') and child.children:
                 search_children(child, child_path, depth + 1)
 
-    for attr in ['instruments', 'sounds', 'drums', 'audio_effects', 'midi_effects']:
+    for attr in ['instruments', 'sounds', 'drums', 'audio_effects', 'midi_effects', 'plugins', 'user_library']:
         if len(results) >= max_results:
             break
         if hasattr(browser, attr):
@@ -767,7 +769,8 @@ def handle_crawl_browser(surface, params):
     cat_map = {
         "instruments": "instruments", "sounds": "sounds",
         "drums": "drums", "audio_effects": "audio_effects",
-        "midi_effects": "midi_effects",
+        "midi_effects": "midi_effects", "plugins": "plugins",
+        "user_library": "user_library",
     }
     cats = cat_map if category == "all" else {category: cat_map[category]}
     result = {}
